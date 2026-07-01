@@ -10,7 +10,8 @@ Open [src/app/App.tsx](src/app/App.tsx) and look for this section:
 const API_BASES = [
   (import.meta as any).env?.VITE_API_BASE,
   "http://localhost:5001",
-  "http://localhost:5000"
+  "http://localhost:5000",
+  ""
 ].filter(Boolean) as string[];
 ```
 
