@@ -754,9 +754,9 @@ function DashboardPage({ onNavigate, modules, onStartModule, user, logout, lastA
               <p className="text-sm text-white/60 mb-5">{activeModule.description}</p>
               <div className="flex items-center gap-3 mb-6">
                 <div className="flex-1 h-1.5 bg-white/15 rounded-full overflow-hidden">
-                  <div className="h-full bg-[#16A085] rounded-full transition-all duration-1000" style={{ width: `${moduleProgress[activeModule._id] ?? activeModule.progress ?? 0}%` }} />
+                  <div className="h-full bg-[#16A085] rounded-full transition-all duration-1000" style={{ width: `${activeProgress}%` }} />
                 </div>
-                <span className="text-sm font-semibold text-white/70 shrink-0">{moduleProgress[activeModule._id] ?? activeModule.progress ?? 0}%</span>
+                <span className="text-sm font-semibold text-white/70 shrink-0">{activeProgress}%</span>
               </div>
               <TealButton onClick={() => onStartModule(activeModule._id)} size="lg">
                 Continue Module <ArrowRight size={15} />
