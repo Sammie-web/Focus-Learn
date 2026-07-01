@@ -220,8 +220,8 @@ function AdminTableSkeleton() {
 
 // ─── REUSABLE COMPONENTS ──────────────────────────────────────────────────────
 
-function TealButton({ children, onClick, size = "md", type = "button", disabled = false, className = "" }: {
-  children: ReactNode; onClick?: () => void; size?: "sm" | "md" | "lg";
+function TealButton({ children, onClick, icon, size = "md", type = "button", disabled = false, className = "" }: {
+  children: ReactNode; onClick?: () => void; icon?: ReactNode; size?: "sm" | "md" | "lg";
   type?: "button" | "submit"; disabled?: boolean; className?: string;
 }) {
   const sizes = { sm: "px-3 py-1.5 text-xs", md: "px-5 py-2.5 text-sm", lg: "px-6 py-3 text-sm" };
@@ -616,22 +616,36 @@ function LandingPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
 }
 
 // ─── LOGIN PAGE ───────────────────────────────────────────────────────────────
-function LoginPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
+function LoginPage({ onNavigate, loginUser }: { onNavigate: (p: Page) => void; loginUser: (email: string, password: string) => Promise<any>; }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      await loginUser(email, password);
+    } catch (_error) {
+      // toast handled by App
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 py-12 bg-[#F9FAFB]">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-sm">
         <div className="bg-white rounded-2xl border border-[#E5E7EB] p-8">
           <h1 className="text-xl font-bold text-[#1A3A5C] mb-1">Welcome back</h1>
           <p className="text-sm text-[#6B7280] mb-7">Sign in to continue learning</p>
-          <form onSubmit={e => { e.preventDefault(); onNavigate("dashboard"); }} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <Field label="Email address" type="email" placeholder="you@university.edu.ng" value={email} onChange={setEmail} required />
             <PasswordField label="Password" placeholder="Enter your password" value={password} onChange={setPassword} />
             <div className="flex justify-end">
               <button type="button" className="text-xs text-[#16A085] hover:underline">Forgot password?</button>
             </div>
-            <TealButton type="submit" className="w-full justify-center" size="lg">Sign In</TealButton>
+            <TealButton type="submit" className="w-full justify-center" size="lg" disabled={isSubmitting}>{isSubmitting ? "Signing In..." : "Sign In"}</TealButton>
           </form>
           <p className="text-sm text-center text-[#6B7280] mt-6">
             {"Don't have an account? "}
@@ -644,11 +658,29 @@ function LoginPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
 }
 
 // ─── REGISTER PAGE ────────────────────────────────────────────────────────────
-function RegisterPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
+function RegisterPage({ onNavigate, registerUser }: { onNavigate: (p: Page) => void; registerUser: (fullName: string, email: string, password: string) => Promise<any>; }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (password !== confirm) {
+      alert("Passwords do not match.");
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await registerUser(name, email, password);
+    } catch (_error) {
+      // toast handled by App
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 py-12 bg-[#F9FAFB]">
       <div className="w-full max-w-4xl grid md:grid-cols-2 gap-10 items-center">
@@ -656,12 +688,12 @@ function RegisterPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
           className="bg-white rounded-2xl border border-[#E5E7EB] p-8">
           <h1 className="text-xl font-bold text-[#1A3A5C] mb-1">Create your account</h1>
           <p className="text-sm text-[#6B7280] mb-7">Join FocusLearn and start studying smarter</p>
-          <form onSubmit={e => { e.preventDefault(); onNavigate("dashboard"); }} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <Field label="Full Name" placeholder="Adaeze Okonkwo" value={name} onChange={setName} required />
             <Field label="Email address" type="email" placeholder="you@university.edu.ng" value={email} onChange={setEmail} required />
             <PasswordField label="Password" placeholder="Create a password" value={password} onChange={setPassword} />
             <PasswordField label="Confirm Password" placeholder="Confirm your password" value={confirm} onChange={setConfirm} />
-            <TealButton type="submit" className="w-full justify-center" size="lg">Create Account</TealButton>
+            <TealButton type="submit" className="w-full justify-center" size="lg" disabled={isSubmitting}>{isSubmitting ? "Creating account..." : "Create Account"}</TealButton>
           </form>
           <p className="text-sm text-center text-[#6B7280] mt-6">
             Already have an account?{" "}
@@ -695,33 +727,46 @@ function RegisterPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
 }
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
-function DashboardPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
-  const mod = modules[0];
+function DashboardPage({ onNavigate, modules, onStartModule, user, logout, lastAccessedModuleId, moduleProgress }: { onNavigate: (p: Page) => void; modules: ModuleItem[]; onStartModule: (moduleId: string) => Promise<void>; user: AuthUser | null; logout: () => void; lastAccessedModuleId: string | null; moduleProgress?: Record<string, number>; }) {
+  // Show the last accessed module if available, otherwise show the first active module
+  const progressByModule = moduleProgress ?? {};
+  const lastModule = lastAccessedModuleId ? modules.find(m => m._id === lastAccessedModuleId) : null;
+  const activeModule = lastModule || modules.find(m => m.isActive !== false) || modules[0] || null;
+  const activeProgress = activeModule ? (progressByModule[activeModule._id] ?? activeModule.progress ?? 0) : 0;
   const h = new Date().getHours();
   const greeting = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
   return (
     <div className="bg-[#F9FAFB] min-h-[calc(100vh-4rem)]">
       <div className="max-w-4xl mx-auto px-4 py-10">
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
-          <div className="mb-8">
-            <p className="text-sm text-[#9CA3AF]">{greeting}</p>
-            <h1 className="text-2xl font-bold text-[#1A3A5C]">Welcome back, Adaeze</h1>
+          <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm text-[#9CA3AF]">{greeting}</p>
+              <h1 className="text-2xl font-bold text-[#1A3A5C]">Welcome back{user ? `, ${user.fullName.split(" ")[0]}` : ""}</h1>
+            </div>
+            <button onClick={logout} className="text-xs text-[#16A085] font-semibold hover:underline">Sign out</button>
           </div>
 
-          <div className="bg-[#1A3A5C] rounded-2xl p-6 md:p-8 mb-5">
-            <p className="text-xs font-semibold text-white/40 uppercase tracking-widest mb-1.5">Continue Where You Left Off</p>
-            <h2 className="text-xl font-bold text-white mb-2">{mod.title}</h2>
-            <p className="text-sm text-white/60 mb-5">{mod.description}</p>
-            <div className="flex items-center gap-3 mb-6">
-              <div className="flex-1 h-1.5 bg-white/15 rounded-full overflow-hidden">
-                <div className="h-full bg-[#16A085] rounded-full transition-all duration-1000" style={{ width: `${mod.progress}%` }} />
+          {activeModule ? (
+            <div className="bg-[#1A3A5C] rounded-2xl p-6 md:p-8 mb-5">
+              <p className="text-xs font-semibold text-white/40 uppercase tracking-widest mb-1.5">Continue Where You Left Off</p>
+              <h2 className="text-xl font-bold text-white mb-2">{activeModule.title}</h2>
+              <p className="text-sm text-white/60 mb-5">{activeModule.description}</p>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="flex-1 h-1.5 bg-white/15 rounded-full overflow-hidden">
+                  <div className="h-full bg-[#16A085] rounded-full transition-all duration-1000" style={{ width: `${moduleProgress[activeModule._id] ?? activeModule.progress ?? 0}%` }} />
+                </div>
+                <span className="text-sm font-semibold text-white/70 shrink-0">{moduleProgress[activeModule._id] ?? activeModule.progress ?? 0}%</span>
               </div>
-              <span className="text-sm font-semibold text-white/70 shrink-0">{mod.progress}%</span>
+              <TealButton onClick={() => onStartModule(activeModule._id)} size="lg">
+                Continue Module <ArrowRight size={15} />
+              </TealButton>
             </div>
-            <TealButton onClick={() => onNavigate("lesson")} size="lg">
-              Continue Module <ArrowRight size={15} />
-            </TealButton>
-          </div>
+          ) : (
+            <div className="bg-white border border-[#E5E7EB] rounded-2xl p-6 md:p-8 mb-5">
+              <p className="text-sm text-[#6B7280]">No active module found yet. Select a module below to get started.</p>
+            </div>
+          )}
 
           <div className="grid sm:grid-cols-2 gap-4 mb-8">
             <div className="bg-white border border-[#E5E7EB] rounded-xl p-5 flex items-start gap-3">
@@ -747,27 +792,30 @@ function DashboardPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
           <div>
             <h2 className="text-sm font-bold text-[#1A3A5C] mb-3 uppercase tracking-wide">All Modules</h2>
             <div className="space-y-2.5">
-              {modules.map(m => (
-                <div key={m.id} className="bg-white border border-[#E5E7EB] rounded-xl p-4 flex items-center gap-3">
+              {modules.map(m => {
+                const modulePercent = progressByModule[m._id] ?? m.progress ?? 0;
+                return (
+                <button key={m._id} onClick={() => onStartModule(m._id)} className="w-full bg-white border border-[#E5E7EB] rounded-xl p-4 flex items-center gap-3 text-left hover:bg-[#F9FAFB] transition-colors">
                   <div className="w-9 h-9 rounded-xl bg-[#F3F4F6] flex items-center justify-center shrink-0">
                     <BookOpen size={16} className="text-[#9CA3AF]" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-[#1A3A5C] text-sm truncate">{m.title}</p>
-                    <p className="text-xs text-[#9CA3AF] mt-0.5">{m.lessons} lessons · {m.quizzes} quizzes</p>
+                    <p className="text-xs text-[#9CA3AF] mt-0.5">{m.sections?.length ?? 0} lessons · {m.isActive ? "Active" : "Draft"}</p>
                   </div>
-                  {m.progress > 0 ? (
+                  {modulePercent > 0 ? (
                     <div className="flex items-center gap-2 shrink-0">
                       <div className="w-16 h-1.5 bg-[#F3F4F6] rounded-full overflow-hidden">
-                        <div className="h-full bg-[#16A085] rounded-full" style={{ width: `${m.progress}%` }} />
+                        <div className="h-full bg-[#16A085] rounded-full" style={{ width: `${modulePercent}%` }} />
                       </div>
-                      <span className="text-xs text-[#9CA3AF]">{m.progress}%</span>
+                      <span className="text-xs text-[#9CA3AF]">{modulePercent}%</span>
                     </div>
                   ) : (
-                    <Badge text={m.status === "draft" ? "Draft" : "Not started"} color={m.status === "draft" ? "yellow" : "gray"} />
+                    <Badge text={m.isActive ? "Active" : "Draft"} color={m.isActive ? "green" : "yellow"} />
                   )}
-                </div>
-              ))}
+                </button>
+                );
+              })}
             </div>
           </div>
         </motion.div>
@@ -777,22 +825,34 @@ function DashboardPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
 }
 
 // ─── LESSON VIEWER ────────────────────────────────────────────────────────────
-function LessonPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
-  const [section, setSection] = useState(0);
+function LessonPage({ onNavigate, module, currentSection, onSectionChange, onProgressUpdate }: { onNavigate: (p: Page) => void; module: ModuleItem | null; currentSection: number; onSectionChange: (section: number) => void; onProgressUpdate: (section: number) => void; }) {
   const total = lessonContent.length;
-  const cur = lessonContent[section];
+  const cur = lessonContent[currentSection];
+  
+  const handleNext = () => {
+    const nextSection = currentSection + 1;
+    onSectionChange(nextSection);
+    onProgressUpdate(nextSection);
+  };
+  
+  const handlePrevious = () => {
+    const prevSection = Math.max(0, currentSection - 1);
+    onSectionChange(prevSection);
+    onProgressUpdate(prevSection);
+  };
+  
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-white">
       <div className="h-1 bg-[#F3F4F6]">
-        <motion.div className="h-full bg-[#16A085]" initial={{ width: 0 }} animate={{ width: `${((section + 1) / total) * 100}%` }} transition={{ duration: 0.4 }} />
+        <motion.div className="h-full bg-[#16A085]" initial={{ width: 0 }} animate={{ width: `${((currentSection + 1) / total) * 100}%` }} transition={{ duration: 0.4 }} />
       </div>
       <div className="max-w-[650px] mx-auto px-4 py-10">
         <div className="flex items-center justify-between mb-10 text-xs text-[#9CA3AF] font-medium">
-          <span>Section {section + 1} of {total}</span>
-          <span>Introduction to Data Structures</span>
+          <span>Section {currentSection + 1} of {total}</span>
+          <span>{module?.title ?? "Lesson"}</span>
         </div>
         <AnimatePresence mode="wait">
-          <motion.div key={section} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.25 }}>
+          <motion.div key={currentSection} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.25 }}>
             <h1 className="text-2xl font-bold text-[#1A3A5C] mb-7">{cur.title}</h1>
             <div className="space-y-4">
               {cur.content.split("\n\n").map((para, i) => (
@@ -800,10 +860,10 @@ function LessonPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
               ))}
             </div>
             <div className="flex items-center justify-between mt-12 pt-6 border-t border-[#E5E7EB]">
-              <Btn variant="secondary" onClick={() => setSection(Math.max(0, section - 1))}
-                disabled={section === 0} icon={<ChevronLeft size={15} />}>Previous</Btn>
-              {section < total - 1 ? (
-                <Btn onClick={() => setSection(section + 1)} icon={<ChevronRight size={15} />}>Next</Btn>
+              <Btn variant="secondary" onClick={handlePrevious}
+                disabled={currentSection === 0} icon={<ChevronLeft size={15} />}>Previous</Btn>
+              {currentSection < total - 1 ? (
+                <Btn onClick={handleNext} icon={<ChevronRight size={15} />}>Next</Btn>
               ) : (
                 <TealButton onClick={() => onNavigate("quiz")}>Take Quiz <ArrowRight size={15} /></TealButton>
               )}
@@ -816,14 +876,26 @@ function LessonPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
 }
 
 // ─── QUIZ PAGE ────────────────────────────────────────────────────────────────
-function QuizPage({ onNavigate, delayed = false }: { onNavigate: (p: Page) => void; delayed?: boolean }) {
+function QuizPage({ onNavigate, delayed = false, module, questions, onSubmit }: { onNavigate: (p: Page) => void; delayed?: boolean; module: ModuleItem | null; questions: QuizQuestionItem[]; onSubmit: (answers: Record<string, number>) => Promise<any>; }) {
   const [current, setCurrent] = useState(0);
-  const [answers, setAnswers] = useState<Record<number, number>>({});
-  const q = quizQuestions[current];
+  const [answers, setAnswers] = useState<Record<string, number>>({});
+  const q = questions[current];
+  const handleSubmit = async () => {
+    if (!module) {
+      alert("Module not selected.");
+      return;
+    }
+    try {
+      await onSubmit(answers);
+      onNavigate(delayed ? "results-delayed" : "survey");
+    } catch (error) {
+      // error handled by App
+    }
+  };
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-white">
       <div className="h-1 bg-[#F3F4F6]">
-        <motion.div className="h-full bg-[#16A085]" initial={{ width: 0 }} animate={{ width: `${((current + 1) / quizQuestions.length) * 100}%` }} transition={{ duration: 0.3 }} />
+        <motion.div className="h-full bg-[#16A085]" initial={{ width: 0 }} animate={{ width: `${((current + 1) / Math.max(questions.length, 1)) * 100}%` }} transition={{ duration: 0.3 }} />
       </div>
       <div className="max-w-[640px] mx-auto px-4 py-10">
         {delayed && (
@@ -834,13 +906,13 @@ function QuizPage({ onNavigate, delayed = false }: { onNavigate: (p: Page) => vo
         )}
         <AnimatePresence mode="wait">
           <motion.div key={current} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.22 }}>
-            <p className="text-xs font-semibold text-[#9CA3AF] mb-3 uppercase tracking-wide">Question {current + 1} of {quizQuestions.length}</p>
-            <h2 className="text-xl font-bold text-[#1A3A5C] mb-8 leading-snug">{q.question}</h2>
+            <p className="text-xs font-semibold text-[#9CA3AF] mb-3 uppercase tracking-wide">Question {current + 1} of {questions.length}</p>
+            <h2 className="text-xl font-bold text-[#1A3A5C] mb-8 leading-snug">{q?.question ?? "Loading question..."}</h2>
             <div className="space-y-3">
-              {q.options.map((opt, i) => {
-                const sel = answers[q.id] === i;
+              {q?.options?.map((opt, i) => {
+                const sel = answers[q._id] === i;
                 return (
-                  <button key={i} onClick={() => setAnswers({ ...answers, [q.id]: i })}
+                  <button key={i} onClick={() => q && setAnswers({ ...answers, [q._id]: i })}
                     className={`w-full flex items-center gap-4 p-4 rounded-xl border text-left transition-all duration-150 ${sel ? "border-[#16A085] bg-[#F0FBF8]" : "border-[#E5E7EB] hover:border-[#D1D5DB] hover:bg-[#F9FAFB]"}`}>
                     <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${sel ? "border-[#16A085]" : "border-[#D1D5DB]"}`}>
                       {sel && <div className="w-2.5 h-2.5 rounded-full bg-[#16A085]" />}
@@ -852,10 +924,10 @@ function QuizPage({ onNavigate, delayed = false }: { onNavigate: (p: Page) => vo
             </div>
             <div className="flex items-center justify-between mt-10 pt-6 border-t border-[#E5E7EB]">
               <Btn variant="secondary" onClick={() => setCurrent(Math.max(0, current - 1))} disabled={current === 0} icon={<ChevronLeft size={15} />}>Previous</Btn>
-              {current < quizQuestions.length - 1 ? (
+              {current < questions.length - 1 ? (
                 <Btn onClick={() => setCurrent(current + 1)} icon={<ChevronRight size={15} />}>Next</Btn>
               ) : (
-                <TealButton onClick={() => onNavigate(delayed ? "results-delayed" : "survey")}>
+                <TealButton onClick={handleSubmit}>
                   {delayed ? "Submit Quiz" : "Submit & Continue"}
                 </TealButton>
               )}
@@ -877,8 +949,24 @@ const tlxDimensions = [
   { id: "frustration", label: "Frustration", desc: "How insecure, discouraged, or stressed were you?" },
 ];
 
-function SurveyPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
+function SurveyPage({ onNavigate, module, onSubmit }: { onNavigate: (p: Page) => void; module: ModuleItem | null; onSubmit: (moduleId: string, survey: Record<string, number>) => Promise<any>; }) {
   const [vals, setVals] = useState<Record<string, number>>({ mental: 40, physical: 18, temporal: 35, performance: 72, effort: 44, frustration: 28 });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const handleSubmit = async () => {
+    if (!module) {
+      alert("Module not selected.");
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await onSubmit(module._id, vals);
+      onNavigate("results-immediate");
+    } catch (_error) {
+      // handled by App
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
   return (
     <div className="bg-[#F9FAFB] min-h-[calc(100vh-4rem)]">
       <div className="max-w-[620px] mx-auto px-4 py-10">
@@ -909,8 +997,8 @@ function SurveyPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
             ))}
           </div>
           <div className="mt-8">
-            <TealButton onClick={() => onNavigate("results-immediate")} size="lg" className="w-full justify-center">
-              Submit Survey
+            <TealButton onClick={handleSubmit} size="lg" className="w-full justify-center" disabled={isSubmitting}>
+              {isSubmitting ? "Submitting..." : "Submit Survey"}
             </TealButton>
           </div>
         </motion.div>
@@ -920,10 +1008,14 @@ function SurveyPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
 }
 
 // ─── RESULTS PAGE ─────────────────────────────────────────────────────────────
-function ResultsPage({ onNavigate, delayed = false }: { onNavigate: (p: Page) => void; delayed?: boolean }) {
-  const score = delayed ? 0.73 : 0.85;
+function ResultsPage({ onNavigate, delayed = false, result }: { onNavigate: (p: Page) => void; delayed?: boolean; result: any; }) {
+  const score = typeof result?.percentage === "number" ? result.percentage / 100 : delayed ? 0.73 : 0.85;
   const r = 42;
   const circumference = 2 * Math.PI * r;
+  const totalCorrect = result?.score ?? 0;
+  const questionCount = result?.answersSubmitted?.length ?? 0;
+  const timeTaken = result?.timeSpent ? `${Math.floor(result.timeSpent / 60)}m ${result.timeSpent % 60}s` : "—";
+  const nasaScore = result?.nasaCompositeScore ? `${result.nasaCompositeScore} / 100` : "—";
   return (
     <div className="bg-[#F9FAFB] min-h-[calc(100vh-4rem)]">
       <div className="max-w-[580px] mx-auto px-4 py-10">
@@ -1002,9 +1094,23 @@ function ResultsPage({ onNavigate, delayed = false }: { onNavigate: (p: Page) =>
 }
 
 // ─── ADMIN LOGIN ──────────────────────────────────────────────────────────────
-function AdminLoginPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
+function AdminLoginPage({ onNavigate, adminLogin }: { onNavigate: (p: Page) => void; adminLogin: (email: string, password: string) => Promise<any>; }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      await adminLogin(email, password);
+    } catch (_error) {
+      // error handled by App
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center px-4">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-sm">
@@ -1016,10 +1122,10 @@ function AdminLoginPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
           <p className="text-sm text-[#6B7280] mt-1">Researcher access only</p>
         </div>
         <div className="bg-white border border-[#E5E7EB] rounded-2xl p-8">
-          <form onSubmit={e => { e.preventDefault(); onNavigate("admin-dashboard"); }} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <Field label="Email address" type="email" placeholder="researcher@university.edu.ng" value={email} onChange={setEmail} />
             <PasswordField label="Password" placeholder="Enter your password" value={password} onChange={setPassword} />
-            <Btn type="submit" variant="primary" className="w-full justify-center" size="lg">Sign In</Btn>
+            <Btn type="submit" variant="primary" className="w-full justify-center" size="lg" disabled={isSubmitting}>{isSubmitting ? "Signing In..." : "Sign In"}</Btn>
           </form>
           <button onClick={() => onNavigate("landing")}
             className="mt-5 w-full text-center text-xs text-[#9CA3AF] hover:text-[#374151] flex items-center justify-center gap-1 transition-colors">
@@ -1032,59 +1138,34 @@ function AdminLoginPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
 }
 
 // ─── ADMIN DASHBOARD ──────────────────────────────────────────────────────────
-function AdminDashboardPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
+function AdminDashboardPage({ onNavigate, metrics }: { onNavigate: (p: Page) => void; metrics: any; }) {
+  const dashMetrics = metrics || {};
+  const userCount = dashMetrics.userCount ?? 0;
+  const moduleCount = dashMetrics.moduleCount ?? 0;
+  const resultCount = dashMetrics.resultCount ?? 0;
+  const nasaCount = dashMetrics.nasaCount ?? 0;
+  
   return (
     <div className="p-6 md:p-8">
       <div className="mb-7">
         <h2 className="text-xl font-bold text-[#1A3A5C]">Research Overview</h2>
-        <p className="text-sm text-[#6B7280] mt-0.5">Module 1 — Introduction to Data Structures</p>
+        <p className="text-sm text-[#6B7280] mt-0.5">{moduleCount} module{moduleCount !== 1 ? 's' : ''} · {userCount} participants</p>
       </div>
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-7">
-        <StatCard label="Total Participants" value="48" icon={Users} trend="up" />
-        <StatCard label="Control Group" value="24" sub="Standard interface" />
-        <StatCard label="Experimental Group" value="24" sub="Minimalist interface" />
-        <StatCard label="Avg. NASA-TLX" value="42.3" sub="Lower = less load" icon={Target} />
-        <StatCard label="Immediate Recall" value="67.8%" icon={CheckCircle} trend="up" />
-        <StatCard label="Delayed Recall" value="58.4%" icon={TrendingUp} />
+        <StatCard label="Total Participants" value={userCount.toString()} icon={Users} />
+        <StatCard label="Quiz Results" value={resultCount.toString()} />
+        <StatCard label="NASA-TLX Surveys" value={nasaCount.toString()} icon={Target} />
+        <StatCard label="Active Modules" value={moduleCount.toString()} />
       </div>
-      <div className="grid lg:grid-cols-2 gap-5">
-        <div className="bg-white border border-[#E5E7EB] rounded-xl p-5">
-          <h3 className="font-semibold text-[#1A3A5C] text-sm mb-0.5">Cognitive Load Comparison</h3>
-          <p className="text-xs text-[#9CA3AF] mb-4">NASA-TLX dimensions by group</p>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={cognitiveLoadData} barGap={3}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" vertical={false} />
-              <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#9CA3AF" }} />
-              <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: "#9CA3AF" }} />
-              <Tooltip contentStyle={{ borderRadius: "8px", border: "1px solid #E5E7EB", fontSize: "11px" }} />
-              <Legend formatter={v => <span className="text-xs text-[#6B7280]">{v === "control" ? "Control" : "Experimental"}</span>} />
-              <Bar dataKey="control" fill="#1A3A5C" radius={[3, 3, 0, 0]} />
-              <Bar dataKey="experimental" fill="#16A085" radius={[3, 3, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="bg-white border border-[#E5E7EB] rounded-xl p-5">
-          <h3 className="font-semibold text-[#1A3A5C] text-sm mb-0.5">Retention Over Time</h3>
-          <p className="text-xs text-[#9CA3AF] mb-4">Weekly score comparison</p>
-          <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={retentionData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" vertical={false} />
-              <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#9CA3AF" }} />
-              <YAxis domain={[30, 80]} tick={{ fontSize: 10, fill: "#9CA3AF" }} />
-              <Tooltip contentStyle={{ borderRadius: "8px", border: "1px solid #E5E7EB", fontSize: "11px" }} />
-              <Legend formatter={v => <span className="text-xs text-[#6B7280]">{v === "control" ? "Control" : "Experimental"}</span>} />
-              <Line type="monotone" dataKey="control" stroke="#1A3A5C" strokeWidth={2} dot={{ r: 3, fill: "#1A3A5C" }} />
-              <Line type="monotone" dataKey="experimental" stroke="#16A085" strokeWidth={2} dot={{ r: 3, fill: "#16A085" }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+      <div className="bg-white border border-[#E5E7EB] rounded-xl p-5">
+        <p className="text-sm text-[#6B7280] text-center py-8">Analytics charts will appear when survey data is available.</p>
       </div>
     </div>
   );
 }
 
 // ─── ADMIN MODULES ────────────────────────────────────────────────────────────
-function AdminModulesPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
+function AdminModulesPage({ onNavigate, modules }: { onNavigate: (p: Page) => void; modules: ModuleItem[]; }) {
   return (
     <div className="p-6 md:p-8">
       <div className="flex items-center justify-between mb-6">
@@ -1105,7 +1186,7 @@ function AdminModulesPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
           </thead>
           <tbody>
             {modules.map(m => (
-              <tr key={m.id} className="border-b border-[#E5E7EB] last:border-0 hover:bg-[#F9FAFB] transition-colors">
+              <tr key={m._id} className="border-b border-[#E5E7EB] last:border-0 hover:bg-[#F9FAFB] transition-colors">
                 <td className="px-4 py-4">
                   <p className="font-semibold text-[#1A3A5C] text-sm">{m.title}</p>
                   <p className="text-xs text-[#9CA3AF] mt-0.5">{m.description}</p>
@@ -1290,18 +1371,18 @@ function AdminQuizFormPage({ onNavigate, isEdit = false }: { onNavigate: (p: Pag
 }
 
 // ─── PARTICIPANTS ─────────────────────────────────────────────────────────────
-function AdminParticipantsPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
+function AdminParticipantsPage({ onNavigate, participants }: { onNavigate: (p: Page) => void; participants: any[] }) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const filtered = participants.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase()) || p.email.toLowerCase().includes(search.toLowerCase())
+  const filtered = (participants || []).filter(p =>
+    (p.fullName || "").toLowerCase().includes(search.toLowerCase()) || (p.email || "").toLowerCase().includes(search.toLowerCase())
   );
   return (
     <div className="p-6 md:p-8">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-xl font-bold text-[#1A3A5C]">Participants</h2>
-          <p className="text-sm text-[#9CA3AF] mt-0.5">{participants.length} registered</p>
+          <p className="text-sm text-[#9CA3AF] mt-0.5">{(participants || []).length} registered</p>
         </div>
         <Btn variant="secondary" onClick={() => onNavigate("admin-assign-groups")} icon={<Users size={14} />}>Assign Groups</Btn>
       </div>
@@ -1320,28 +1401,30 @@ function AdminParticipantsPage({ onNavigate }: { onNavigate: (p: Page) => void }
           <table className="w-full min-w-[560px]">
             <thead>
               <tr className="border-b border-[#E5E7EB] bg-[#F9FAFB]">
-                {["Name", "Email", "Device", "Group", "Status"].map(h => (
+                {["Name", "Email", "Group", "Registered"].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-bold text-[#9CA3AF] uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {filtered.slice((page - 1) * 5, page * 5).map(p => (
-                <tr key={p.id} className="border-b border-[#E5E7EB] last:border-0 hover:bg-[#F9FAFB] transition-colors">
-                  <td className="px-4 py-3.5">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-full bg-[#1A3A5C] flex items-center justify-center text-[10px] font-bold text-white shrink-0">
-                        {p.name.split(" ").map(n => n[0]).join("")}
+              {filtered.slice((page - 1) * 5, page * 5).map((p, i) => {
+                const initials = (p.fullName || "U").split(" ").slice(0, 2).map((n: string) => n[0]).join("").toUpperCase();
+                return (
+                  <tr key={p._id || i} className="border-b border-[#E5E7EB] last:border-0 hover:bg-[#F9FAFB] transition-colors">
+                    <td className="px-4 py-3.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-full bg-[#1A3A5C] flex items-center justify-center text-[10px] font-bold text-white shrink-0">
+                          {initials}
+                        </div>
+                        <span className="font-semibold text-[#1A3A5C] text-sm">{p.fullName}</span>
                       </div>
-                      <span className="font-semibold text-[#1A3A5C] text-sm">{p.name}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3.5 text-xs text-[#6B7280]">{p.email}</td>
-                  <td className="px-4 py-3.5 text-sm text-[#374151]">{p.device}</td>
-                  <td className="px-4 py-3.5"><Badge text={p.group} color={p.group === "Experimental" ? "blue" : "gray"} /></td>
-                  <td className="px-4 py-3.5"><Badge text={p.status} color={p.status === "Active" ? "green" : "yellow"} /></td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-4 py-3.5 text-xs text-[#6B7280]">{p.email}</td>
+                    <td className="px-4 py-3.5"><Badge text={p.group || "Unassigned"} color={p.group === "Experimental" ? "blue" : p.group === "Control" ? "gray" : "yellow"} /></td>
+                    <td className="px-4 py-3.5 text-xs text-[#9CA3AF]">{p.createdAt ? new Date(p.createdAt).toLocaleDateString() : "—"}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -1419,7 +1502,13 @@ function AdminAssignGroupsPage({ onNavigate }: { onNavigate: (p: Page) => void }
 }
 
 // ─── ADMIN ANALYTICS ─────────────────────────────────────────────────────────
-function AdminAnalyticsPage() {
+function AdminAnalyticsPage({ analytics }: { analytics: any }) {
+  const data = analytics || {};
+  const nasaScore = data.averageNasaScore ?? 0;
+  const immediateAvg = data.immediateRecallAverage ?? 0;
+  const delayedAvg = data.delayedRecallAverage ?? 0;
+  const retentionDrop = data.retentionDrop ?? 0;
+  
   return (
     <div className="p-6 md:p-8">
       <div className="mb-7">
@@ -1427,10 +1516,10 @@ function AdminAnalyticsPage() {
         <p className="text-sm text-[#9CA3AF] mt-0.5">Research data summary</p>
       </div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-7">
-        <StatCard label="Avg. NASA-TLX" value="42.3" icon={Target} sub="Experimental group" />
-        <StatCard label="Immediate Recall" value="67.8%" icon={CheckCircle} trend="up" />
-        <StatCard label="Delayed Recall" value="58.4%" icon={TrendingUp} />
-        <StatCard label="Retention Rate" value="86.1%" sub="Exp vs control" trend="up" />
+        <StatCard label="Avg. NASA-TLX" value={nasaScore.toFixed(1)} icon={Target} />
+        <StatCard label="Immediate Recall" value={immediateAvg.toFixed(1) + "%"} icon={CheckCircle} />
+        <StatCard label="Delayed Recall" value={delayedAvg.toFixed(1) + "%"} icon={TrendingUp} />
+        <StatCard label="Retention Drop" value={retentionDrop.toFixed(1) + "%"} />
       </div>
       <div className="grid lg:grid-cols-2 gap-5 mb-5">
         <div className="bg-white border border-[#E5E7EB] rounded-xl p-5">
@@ -1487,15 +1576,15 @@ function AdminAnalyticsPage() {
 }
 
 // ─── ADMIN RESULTS ────────────────────────────────────────────────────────────
-function AdminResultsPage() {
+function AdminResultsPage({ results }: { results: any[] }) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const filtered = adminResultsData.filter(r => r.participant.toLowerCase().includes(search.toLowerCase()));
+  const filtered = (results || []).filter(r => (r?.userId?.fullName || "").toLowerCase().includes(search.toLowerCase()));
   return (
     <div className="p-6 md:p-8">
       <div className="mb-6">
         <h2 className="text-xl font-bold text-[#1A3A5C]">Results</h2>
-        <p className="text-sm text-[#9CA3AF] mt-0.5">All participant quiz results</p>
+        <p className="text-sm text-[#9CA3AF] mt-0.5">{(results || []).length} quiz result{(results?.length ?? 0) !== 1 ? 's' : ''}</p>
       </div>
       <div className="flex gap-2.5 mb-4">
         <div className="relative flex-1 max-w-xs">
@@ -1512,24 +1601,25 @@ function AdminResultsPage() {
           <table className="w-full min-w-[640px]">
             <thead>
               <tr className="border-b border-[#E5E7EB] bg-[#F9FAFB]">
-                {["Participant", "Group", "Immediate", "Delayed", "NASA-TLX", "Time on Task"].map(h => (
+                {["Participant", "Module", "Test Type", "Score %", "Time Spent"].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-bold text-[#9CA3AF] uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {filtered.slice((page - 1) * 5, page * 5).map((r, i) => (
-                <tr key={i} className="border-b border-[#E5E7EB] last:border-0 hover:bg-[#F9FAFB] transition-colors">
-                  <td className="px-4 py-3.5 font-semibold text-[#1A3A5C] text-sm">{r.participant}</td>
-                  <td className="px-4 py-3.5"><Badge text={r.group} color={r.group === "Experimental" ? "blue" : "gray"} /></td>
-                  <td className="px-4 py-3.5 text-sm font-medium text-[#374151]">{r.immediate}%</td>
-                  <td className="px-4 py-3.5 text-sm font-medium text-[#374151]">{r.delayed}%</td>
-                  <td className="px-4 py-3.5">
-                    <span className={`text-sm font-semibold ${r.nasaTlx < 40 ? "text-[#16A085]" : "text-amber-600"}`}>{r.nasaTlx}</span>
-                  </td>
-                  <td className="px-4 py-3.5 text-sm text-[#9CA3AF]">{r.time}</td>
-                </tr>
-              ))}
+              {filtered.slice((page - 1) * 5, page * 5).map((r, i) => {
+                const timeMin = r.timeSpent ? Math.floor(r.timeSpent / 60) : 0;
+                const timeSec = r.timeSpent ? r.timeSpent % 60 : 0;
+                return (
+                  <tr key={r._id || i} className="border-b border-[#E5E7EB] last:border-0 hover:bg-[#F9FAFB] transition-colors">
+                    <td className="px-4 py-3.5 font-semibold text-[#1A3A5C] text-sm">{r.userId?.fullName || "—"}</td>
+                    <td className="px-4 py-3.5 text-xs text-[#6B7280]">{r.moduleId?.title || "—"}</td>
+                    <td className="px-4 py-3.5"><Badge text={r.testType === "immediate" ? "Immediate" : "Delayed"} color={r.testType === "immediate" ? "blue" : "yellow"} /></td>
+                    <td className="px-4 py-3.5 text-sm font-medium text-[#374151]">{r.percentage}%</td>
+                    <td className="px-4 py-3.5 text-sm text-[#9CA3AF]">{timeMin}m {timeSec}s</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -1726,18 +1816,388 @@ function DemoNavigator({ currentPage, onNavigate }: { currentPage: Page; onNavig
 }
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
+type AuthUser = { _id: string; fullName: string; email: string; role: string; };
+type AuthState = { user: AuthUser | null; token: string; refreshToken: string; };
+type ToastData = { message: string; type: "success" | "error" | "info"; };
+type ModuleItem = { _id: string; title: string; description: string; sections?: { title: string; content: string }[]; isActive?: boolean; progress?: number; lessons?: number; quizzes?: number; status?: string; };
+type QuizQuestionItem = { _id: string; questionNumber: number; question: string; options: string[]; };
+
+const API_BASES = [ (import.meta as any).env?.VITE_API_BASE, "http://localhost:5001", "http://localhost:5000" ].filter(Boolean) as string[];
+const STORAGE_KEY = "focuslearn-auth";
+
+// ─── ROUTE PROTECTION ─────────────────────────────────────────────────────────
+// Define pages that require authentication and their required roles
+const PAGE_ACCESS_RULES: Record<Page, { requiresAuth: boolean; requiredRole?: string }> = {
+  // Public pages
+  "landing": { requiresAuth: false },
+  "login": { requiresAuth: false },
+  "register": { requiresAuth: false },
+  "admin-login": { requiresAuth: false },
+  "unauthorized": { requiresAuth: false },
+  "not-found": { requiresAuth: false },
+  
+  // Student pages - require authentication
+  "dashboard": { requiresAuth: true },
+  "lesson": { requiresAuth: true },
+  "quiz": { requiresAuth: true },
+  "survey": { requiresAuth: true },
+  "results-immediate": { requiresAuth: true },
+  "results-delayed": { requiresAuth: true },
+  
+  // Admin pages - require authentication + ADMIN role
+  "admin-dashboard": { requiresAuth: true, requiredRole: "ADMIN" },
+  "admin-modules": { requiresAuth: true, requiredRole: "ADMIN" },
+  "admin-module-form": { requiresAuth: true, requiredRole: "ADMIN" },
+  "admin-module-edit": { requiresAuth: true, requiredRole: "ADMIN" },
+  "admin-quizzes": { requiresAuth: true, requiredRole: "ADMIN" },
+  "admin-quiz-form": { requiresAuth: true, requiredRole: "ADMIN" },
+  "admin-quiz-edit": { requiresAuth: true, requiredRole: "ADMIN" },
+  "admin-participants": { requiresAuth: true, requiredRole: "ADMIN" },
+  "admin-assign-groups": { requiresAuth: true, requiredRole: "ADMIN" },
+  "admin-analytics": { requiresAuth: true, requiredRole: "ADMIN" },
+  "admin-results": { requiresAuth: true, requiredRole: "ADMIN" },
+  "admin-export": { requiresAuth: true, requiredRole: "ADMIN" },
+  "admin-settings": { requiresAuth: true, requiredRole: "ADMIN" },
+};
+
+// Check if user can access a page
+const canAccessPage = (page: Page, auth: AuthState): { canAccess: boolean; redirectTo?: Page } => {
+  const rules = PAGE_ACCESS_RULES[page];
+  
+  if (!rules) return { canAccess: false, redirectTo: "not-found" };
+  
+  // Public pages are always accessible
+  if (!rules.requiresAuth) {
+    return { canAccess: true };
+  }
+  
+  // If authentication is required, check if user is logged in
+  if (!auth.token || !auth.user) {
+    // Redirect to login for student pages, unauthorized for admin pages
+    if (page.startsWith("admin")) {
+      return { canAccess: false, redirectTo: "unauthorized" };
+    }
+    return { canAccess: false, redirectTo: "login" };
+  }
+  
+  // If specific role is required, check if user has that role
+  if (rules.requiredRole && auth.user.role !== rules.requiredRole) {
+    return { canAccess: false, redirectTo: "unauthorized" };
+  }
+  
+  return { canAccess: true };
+};
+
 export default function App() {
   const [route, setRoute] = useState<{ page: Page }>({ page: "landing" });
   const [isLoading, setIsLoading] = useState(false);
+  const [auth, setAuth] = useState<AuthState>({ user: null, token: "", refreshToken: "" });
+  const [modulesData, setModulesData] = useState<ModuleItem[]>([]);
+  const [selectedModule, setSelectedModule] = useState<ModuleItem | null>(null);
+  const [moduleQuestions, setModuleQuestions] = useState<QuizQuestionItem[]>([]);
+  const [resultData, setResultData] = useState<any>(null);
+  const [adminMetrics, setAdminMetrics] = useState<any>(null);
+  const [adminParticipants, setAdminParticipants] = useState<any[]>([]);
+  const [adminResults, setAdminResults] = useState<any[]>([]);
+  const [adminAnalytics, setAdminAnalytics] = useState<any>(null);
+  const [currentLessonSection, setCurrentLessonSection] = useState(0);
+  const [lastAccessedModuleId, setLastAccessedModuleId] = useState<string | null>(null);
+  const [moduleProgress, setModuleProgress] = useState<Record<string, number>>({}); // track progress % per module
+  const [toast, setToast] = useState<ToastData | null>(null);
+
+  const PROGRESS_STORAGE_KEY = "focuslearn-progress";
+  const LAST_MODULE_STORAGE_KEY = "focuslearn-last-module";
+
+  const showToast = useCallback((message: string, type: ToastData["type"] = "success") => {
+    setToast({ message, type });
+  }, []);
+
+  const clearAuth = useCallback(() => {
+    setAuth({ user: null, token: "", refreshToken: "" });
+    localStorage.removeItem(STORAGE_KEY);
+  }, []);
+
+  const saveAuth = useCallback((payload: AuthState) => {
+    setAuth(payload);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  }, []);
+
+  const saveModuleProgress = useCallback((moduleId: string, section: number, totalSections: number) => {
+    const progress = Math.min(100, Math.round(((section + 1) / totalSections) * 100));
+    setModuleProgress(prev => {
+      const next = { ...prev, [moduleId]: progress };
+      localStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+    setLastAccessedModuleId(moduleId);
+    setCurrentLessonSection(section);
+    localStorage.setItem(LAST_MODULE_STORAGE_KEY, JSON.stringify({ moduleId, section }));
+  }, []);
+
+  const loadModuleProgress = useCallback(() => {
+    try {
+      const lastModule = localStorage.getItem(LAST_MODULE_STORAGE_KEY);
+      const progressData = localStorage.getItem(PROGRESS_STORAGE_KEY);
+      
+      if (lastModule) {
+        const { moduleId, section } = JSON.parse(lastModule);
+        setLastAccessedModuleId(moduleId);
+        setCurrentLessonSection(section);
+      }
+      
+      if (progressData) {
+        setModuleProgress(JSON.parse(progressData));
+      }
+    } catch {
+      // ignore corrupted storage data
+    }
+  }, []);
+
+  const apiRequest = useCallback(async (path: string, options: RequestInit = {}) => {
+    for (const base of API_BASES) {
+      try {
+        const headers: Record<string, string> = { "Content-Type": "application/json", ...(options.headers as Record<string, string> | undefined) };
+        if (auth.token) {
+          headers.Authorization = `Bearer ${auth.token}`;
+        }
+        const response = await fetch(`${base}${path}`, { ...options, headers });
+        const payload = await response.json();
+        if (!response.ok) {
+          const message = payload?.errors?.join(", ") || payload?.message || response.statusText;
+          throw new Error(message);
+        }
+        return payload.data;
+      } catch (error) {
+        if (error instanceof TypeError && base !== API_BASES[API_BASES.length - 1]) {
+          continue;
+        }
+        throw error;
+      }
+    }
+    throw new Error("Unable to reach the API server.");
+  }, [auth.token]);
+
+  const fetchModules = useCallback(async () => {
+    try {
+      const data = await apiRequest("/api/modules");
+      setModulesData(data);
+    } catch (error: any) {
+      showToast(error.message || "Failed to load modules", "error");
+    }
+  }, [apiRequest, showToast]);
+
+  const fetchQuestions = useCallback(async (moduleId: string) => {
+    try {
+      const data = await apiRequest(`/api/quiz/${moduleId}`);
+      setModuleQuestions(data);
+      return data;
+    } catch (error: any) {
+      showToast(error.message || "Failed to load quiz questions", "error");
+      return [];
+    }
+  }, [apiRequest, showToast]);
+
+  const startModule = useCallback(async (moduleId: string) => {
+    const module = modulesData.find(m => m._id === moduleId);
+    if (!module) {
+      showToast("Selected module not found", "error");
+      return;
+    }
+    setSelectedModule(module);
+    setResultData(null);
+    
+    const savedProgress = localStorage.getItem(LAST_MODULE_STORAGE_KEY);
+    if (savedProgress) {
+      const parsed = JSON.parse(savedProgress);
+      setCurrentLessonSection(parsed?.moduleId === moduleId ? (parsed?.section ?? 0) : 0);
+    } else {
+      setCurrentLessonSection(0);
+    }
+    
+    await fetchQuestions(moduleId);
+    setRoute({ page: "lesson" });
+  }, [modulesData, fetchQuestions, showToast]);
+
+  const logoutUser = useCallback(() => {
+    clearAuth();
+    setSelectedModule(null);
+    setModuleQuestions([]);
+    setResultData(null);
+    setCurrentLessonSection(0);
+    setLastAccessedModuleId(null);
+    setModuleProgress({});
+    localStorage.removeItem(PROGRESS_STORAGE_KEY);
+    localStorage.removeItem(LAST_MODULE_STORAGE_KEY);
+    setRoute({ page: "landing" });
+    showToast("Signed out", "info");
+  }, [clearAuth, showToast]);
+
+  const submitQuiz = useCallback(async (answers: Record<string, number>) => {
+    if (!selectedModule) {
+      showToast("No module selected for quiz submission", "error");
+      throw new Error("No module selected");
+    }
+    try {
+      const answerArray = moduleQuestions.map(q => answers[q._id] ?? -1);
+      const data = await apiRequest("/api/quiz/submit", {
+        method: "POST",
+        body: JSON.stringify({ moduleId: selectedModule._id, answers: answerArray, testType: "immediate", timeSpent: 180 }),
+      });
+      setResultData(data);
+      return data;
+    } catch (error: any) {
+      showToast(error.message || "Failed to submit quiz", "error");
+      throw error;
+    }
+  }, [apiRequest, showToast, selectedModule, moduleQuestions]);
+
+  const submitSurvey = useCallback(async (moduleId: string, survey: Record<string, number>) => {
+    await apiRequest("/api/nasa-tlx", {
+      method: "POST",
+      body: JSON.stringify({ moduleId, ...survey }),
+    });
+    showToast("Survey submitted successfully", "success");
+  }, [apiRequest, showToast]);
+
+  const fetchResults = useCallback(async (moduleId: string, delayed = false) => {
+    try {
+      const path = delayed ? `/api/results/delayed/${moduleId}` : `/api/results/immediate/${moduleId}`;
+      const data = await apiRequest(path);
+      setResultData(data);
+      return data;
+    } catch (error: any) {
+      showToast(error.message || "Failed to load results", "error");
+      return null;
+    }
+  }, [apiRequest, showToast]);
+
+  const loginUser = useCallback(async (email: string, password: string) => {
+    const data = await apiRequest("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    });
+    saveAuth({ user: data.user, token: data.accessToken, refreshToken: data.refreshToken });
+    showToast("Signed in successfully", "success");
+    setRoute({ page: "dashboard" });
+    return data;
+  }, [apiRequest, saveAuth, showToast]);
+
+  const registerUser = useCallback(async (fullName: string, email: string, password: string) => {
+    const data = await apiRequest("/api/auth/register", {
+      method: "POST",
+      body: JSON.stringify({ fullName, email, password }),
+    });
+    saveAuth({ user: data.user, token: data.accessToken, refreshToken: data.refreshToken });
+    showToast("Registration successful", "success");
+    setRoute({ page: "dashboard" });
+    return data;
+  }, [apiRequest, saveAuth, showToast]);
+
+  const adminLogin = useCallback(async (email: string, password: string) => {
+    const data = await apiRequest("/api/auth/admin/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    });
+    saveAuth({ user: data.user, token: data.accessToken, refreshToken: data.refreshToken });
+    showToast("Admin signed in successfully", "success");
+    setRoute({ page: "admin-dashboard" });
+    return data;
+  }, [apiRequest, saveAuth, showToast]);
+
+  const fetchAdminDashboard = useCallback(async () => {
+    try {
+      const data = await apiRequest("/api/admin/dashboard");
+      setAdminMetrics(data);
+    } catch (error: any) {
+      showToast(error.message || "Failed to load admin dashboard", "error");
+    }
+  }, [apiRequest, showToast]);
+
+  const fetchAdminParticipants = useCallback(async () => {
+    try {
+      const data = await apiRequest("/api/admin/participants");
+      setAdminParticipants(data);
+    } catch (error: any) {
+      showToast(error.message || "Failed to load participants", "error");
+    }
+  }, [apiRequest, showToast]);
+
+  const fetchAdminResults = useCallback(async () => {
+    try {
+      const data = await apiRequest("/api/admin/results");
+      setAdminResults(data);
+    } catch (error: any) {
+      showToast(error.message || "Failed to load admin results", "error");
+    }
+  }, [apiRequest, showToast]);
+
+  const fetchAdminAnalytics = useCallback(async () => {
+    try {
+      const data = await apiRequest("/api/admin/analytics");
+      setAdminAnalytics(data);
+    } catch (error: any) {
+      showToast(error.message || "Failed to load analytics", "error");
+    }
+  }, [apiRequest, showToast]);
+
+  useEffect(() => {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    try {
+      const stored = JSON.parse(raw) as AuthState;
+      if (stored?.token) {
+        setAuth(stored);
+        // Also load progress data when restoring auth
+        loadModuleProgress();
+      }
+    } catch {
+      // ignore invalid storage data
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!auth.token) return;
+    fetchModules();
+  }, [auth.token, fetchModules]);
+
+  useEffect(() => {
+    if (!auth.token) return;
+    if (route.page === "admin-dashboard") {
+      fetchAdminDashboard();
+    }
+    if (route.page === "admin-analytics") {
+      fetchAdminAnalytics();
+    }
+    if (route.page === "admin-participants") {
+      fetchAdminParticipants();
+    }
+    if (route.page === "admin-results") {
+      fetchAdminResults();
+    }
+  }, [route.page, auth.token, fetchAdminDashboard, fetchAdminAnalytics, fetchAdminParticipants, fetchAdminResults]);
 
   const navigate = useCallback((page: Page) => {
+    // Check if user can access the requested page
+    const { canAccess, redirectTo } = canAccessPage(page, auth);
+    
+    if (!canAccess) {
+      const targetPage = redirectTo || "not-found";
+      setIsLoading(true);
+      setTimeout(() => {
+        setRoute({ page: targetPage });
+        setIsLoading(false);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }, 650);
+      return;
+    }
+    
     setIsLoading(true);
     setTimeout(() => {
       setRoute({ page });
       setIsLoading(false);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }, 650);
-  }, []);
+  }, [auth]);
 
   const isAdmin = route.page.startsWith("admin") && route.page !== "admin-login";
 
@@ -1767,26 +2227,26 @@ export default function App() {
   const renderPage = () => {
     switch (route.page) {
       case "landing": return <LandingPage onNavigate={navigate} />;
-      case "login": return <LoginPage onNavigate={navigate} />;
-      case "register": return <RegisterPage onNavigate={navigate} />;
-      case "dashboard": return <DashboardPage onNavigate={navigate} />;
-      case "lesson": return <LessonPage onNavigate={navigate} />;
-      case "quiz": return <QuizPage onNavigate={navigate} />;
-      case "survey": return <SurveyPage onNavigate={navigate} />;
-      case "results-immediate": return <ResultsPage onNavigate={navigate} />;
-      case "results-delayed": return <ResultsPage onNavigate={navigate} delayed />;
-      case "admin-login": return <AdminLoginPage onNavigate={navigate} />;
-      case "admin-dashboard": return <AdminDashboardPage onNavigate={navigate} />;
-      case "admin-modules": return <AdminModulesPage onNavigate={navigate} />;
+      case "login": return <LoginPage onNavigate={navigate} loginUser={loginUser} />;
+      case "register": return <RegisterPage onNavigate={navigate} registerUser={registerUser} />;
+      case "dashboard": return <DashboardPage onNavigate={navigate} modules={modulesData} onStartModule={startModule} user={auth.user} logout={logoutUser} lastAccessedModuleId={lastAccessedModuleId} moduleProgress={moduleProgress} />;
+      case "lesson": return <LessonPage onNavigate={navigate} module={selectedModule} currentSection={currentLessonSection} onSectionChange={setCurrentLessonSection} onProgressUpdate={(section) => selectedModule && saveModuleProgress(selectedModule._id, section, lessonContent.length)} />;
+      case "quiz": return <QuizPage onNavigate={navigate} module={selectedModule} questions={moduleQuestions} onSubmit={submitQuiz} />;
+      case "survey": return <SurveyPage onNavigate={navigate} module={selectedModule} onSubmit={submitSurvey} />;
+      case "results-immediate": return <ResultsPage onNavigate={navigate} result={resultData} delayed={false} />;
+      case "results-delayed": return <ResultsPage onNavigate={navigate} result={resultData} delayed />;
+      case "admin-login": return <AdminLoginPage onNavigate={navigate} adminLogin={adminLogin} />;
+      case "admin-dashboard": return <AdminDashboardPage onNavigate={navigate} metrics={adminMetrics} />;
+      case "admin-modules": return <AdminModulesPage onNavigate={navigate} modules={modulesData} />;
       case "admin-module-form": return <AdminModuleFormPage onNavigate={navigate} />;
       case "admin-module-edit": return <AdminModuleFormPage onNavigate={navigate} isEdit />;
       case "admin-quizzes": return <AdminQuizzesPage onNavigate={navigate} />;
       case "admin-quiz-form": return <AdminQuizFormPage onNavigate={navigate} />;
       case "admin-quiz-edit": return <AdminQuizFormPage onNavigate={navigate} isEdit />;
-      case "admin-participants": return <AdminParticipantsPage onNavigate={navigate} />;
+      case "admin-participants": return <AdminParticipantsPage onNavigate={navigate} participants={adminParticipants} />;
       case "admin-assign-groups": return <AdminAssignGroupsPage onNavigate={navigate} />;
-      case "admin-analytics": return <AdminAnalyticsPage />;
-      case "admin-results": return <AdminResultsPage />;
+      case "admin-analytics": return <AdminAnalyticsPage analytics={adminAnalytics} />;
+      case "admin-results": return <AdminResultsPage results={adminResults} />;
       case "admin-export": return <AdminExportPage />;
       case "admin-settings": return <AdminSettingsPage />;
       case "unauthorized": return <UnauthorizedPage onNavigate={navigate} />;
