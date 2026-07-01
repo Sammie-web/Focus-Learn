@@ -1822,7 +1822,7 @@ type ToastData = { message: string; type: "success" | "error" | "info"; };
 type ModuleItem = { _id: string; title: string; description: string; sections?: { title: string; content: string }[]; isActive?: boolean; progress?: number; lessons?: number; quizzes?: number; status?: string; };
 type QuizQuestionItem = { _id: string; questionNumber: number; question: string; options: string[]; };
 
-const API_BASES = [ (import.meta as any).env?.VITE_API_BASE, "http://localhost:5001", "http://localhost:5000", "https://focus-learn-backend.vercel.app/" ].filter(Boolean) as string[];
+const API_BASES = [ (import.meta as any).env?.VITE_API_BASE, "http://localhost:5001", "http://localhost:5000", "https://focus-learn-backend.vercel.app" ].filter(Boolean) as string[];
 const STORAGE_KEY = "focuslearn-auth";
 
 // ─── ROUTE PROTECTION ─────────────────────────────────────────────────────────
