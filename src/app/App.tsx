@@ -1832,6 +1832,7 @@ const API_BASES = [
   .filter(Boolean)
   .map((base) => normalizeApiBase(base as string)) as string[];
 const STORAGE_KEY = "focuslearn-auth";
+const normalizeRole = (role?: string) => role?.toString().trim().toLowerCase();
 
 // ─── ROUTE PROTECTION ─────────────────────────────────────────────────────────
 // Define pages that require authentication and their required roles
@@ -1852,20 +1853,20 @@ const PAGE_ACCESS_RULES: Record<Page, { requiresAuth: boolean; requiredRole?: st
   "results-immediate": { requiresAuth: true },
   "results-delayed": { requiresAuth: true },
   
-  // Admin pages - require authentication + ADMIN role
-  "admin-dashboard": { requiresAuth: true, requiredRole: "ADMIN" },
-  "admin-modules": { requiresAuth: true, requiredRole: "ADMIN" },
-  "admin-module-form": { requiresAuth: true, requiredRole: "ADMIN" },
-  "admin-module-edit": { requiresAuth: true, requiredRole: "ADMIN" },
-  "admin-quizzes": { requiresAuth: true, requiredRole: "ADMIN" },
-  "admin-quiz-form": { requiresAuth: true, requiredRole: "ADMIN" },
-  "admin-quiz-edit": { requiresAuth: true, requiredRole: "ADMIN" },
-  "admin-participants": { requiresAuth: true, requiredRole: "ADMIN" },
-  "admin-assign-groups": { requiresAuth: true, requiredRole: "ADMIN" },
-  "admin-analytics": { requiresAuth: true, requiredRole: "ADMIN" },
-  "admin-results": { requiresAuth: true, requiredRole: "ADMIN" },
-  "admin-export": { requiresAuth: true, requiredRole: "ADMIN" },
-  "admin-settings": { requiresAuth: true, requiredRole: "ADMIN" },
+  // Admin pages - require authentication + admin role
+  "admin-dashboard": { requiresAuth: true, requiredRole: "admin" },
+  "admin-modules": { requiresAuth: true, requiredRole: "admin" },
+  "admin-module-form": { requiresAuth: true, requiredRole: "admin" },
+  "admin-module-edit": { requiresAuth: true, requiredRole: "admin" },
+  "admin-quizzes": { requiresAuth: true, requiredRole: "admin" },
+  "admin-quiz-form": { requiresAuth: true, requiredRole: "admin" },
+  "admin-quiz-edit": { requiresAuth: true, requiredRole: "admin" },
+  "admin-participants": { requiresAuth: true, requiredRole: "admin" },
+  "admin-assign-groups": { requiresAuth: true, requiredRole: "admin" },
+  "admin-analytics": { requiresAuth: true, requiredRole: "admin" },
+  "admin-results": { requiresAuth: true, requiredRole: "admin" },
+  "admin-export": { requiresAuth: true, requiredRole: "admin" },
+  "admin-settings": { requiresAuth: true, requiredRole: "admin" },
 };
 
 // Check if user can access a page
@@ -1889,7 +1890,7 @@ const canAccessPage = (page: Page, auth: AuthState): { canAccess: boolean; redir
   }
   
   // If specific role is required, check if user has that role
-  if (rules.requiredRole && auth.user.role !== rules.requiredRole) {
+  if (rules.requiredRole && normalizeRole(auth.user?.role) !== normalizeRole(rules.requiredRole)) {
     return { canAccess: false, redirectTo: "unauthorized" };
   }
   
@@ -2207,7 +2208,7 @@ export default function App() {
     }, 650);
   }, [auth]);
 
-  const isAdmin = route.page.startsWith("admin") && route.page !== "admin-login";
+  const isAdmin = route.page.startsWith("admin") && route.page !== "admin-login" && normalizeRole(auth.user?.role) === "admin";
 
   const adminTitles: Partial<Record<Page, string>> = {
     "admin-dashboard": "Dashboard", "admin-modules": "Modules",
