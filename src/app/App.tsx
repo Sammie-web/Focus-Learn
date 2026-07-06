@@ -1165,7 +1165,7 @@ function AdminDashboardPage({ onNavigate, metrics }: { onNavigate: (p: Page) => 
 }
 
 // ─── ADMIN MODULES ────────────────────────────────────────────────────────────
-function AdminModulesPage({ onNavigate, modules }: { onNavigate: (p: Page) => void; modules: ModuleItem[]; }) {
+function AdminModulesPage({ onNavigate, modules, onEdit }: { onNavigate: (p: Page) => void; modules: ModuleItem[]; onEdit?: (m: ModuleItem) => void }) {
   return (
     <div className="p-6 md:p-8">
       <div className="flex items-center justify-between mb-6">
@@ -1196,7 +1196,7 @@ function AdminModulesPage({ onNavigate, modules }: { onNavigate: (p: Page) => vo
                 <td className="px-4 py-4"><Badge text={m.status === "active" ? "Active" : "Draft"} color={m.status === "active" ? "green" : "yellow"} /></td>
                 <td className="px-4 py-4">
                   <div className="flex gap-1">
-                    <button onClick={() => onNavigate("admin-module-edit")} className="p-1.5 rounded-lg hover:bg-[#F3F4F6] text-[#9CA3AF] hover:text-[#374151] transition-colors"><Edit2 size={13} /></button>
+                    <button onClick={() => onEdit ? onEdit(m) : onNavigate("admin-module-edit")} className="p-1.5 rounded-lg hover:bg-[#F3F4F6] text-[#9CA3AF] hover:text-[#374151] transition-colors"><Edit2 size={13} /></button>
                     <button className="p-1.5 rounded-lg hover:bg-red-50 text-[#9CA3AF] hover:text-red-600 transition-colors"><Trash2 size={13} /></button>
                   </div>
                 </td>
@@ -1210,14 +1210,23 @@ function AdminModulesPage({ onNavigate, modules }: { onNavigate: (p: Page) => vo
 }
 
 // ─── ADMIN MODULE FORM ────────────────────────────────────────────────────────
-function AdminModuleFormPage({ onNavigate, isEdit = false, onCreateModule }: { onNavigate: (p: Page) => void; isEdit?: boolean; onCreateModule?: (payload: any) => Promise<any>; }) {
-  const [title, setTitle] = useState(isEdit ? "Introduction to Data Structures" : "");
-  const [desc, setDesc] = useState(isEdit ? "Arrays, linked lists, stacks, and queues." : "");
-  const [status, setStatus] = useState(isEdit ? "active" : "draft");
-  const [sectionInputs, setSectionInputs] = useState([{ title: "", content: "" }]);
+function AdminModuleFormPage({ onNavigate, isEdit = false, onCreateModule, onUpdateModule, moduleData }: { onNavigate: (p: Page) => void; isEdit?: boolean; onCreateModule?: (payload: any) => Promise<any>; onUpdateModule?: (id: string, payload: any) => Promise<any>; moduleData?: ModuleItem | null; }) {
+  const [title, setTitle] = useState("");
+  const [desc, setDesc] = useState("");
+  const [status, setStatus] = useState("draft");
+  const [sectionInputs, setSectionInputs] = useState<{ title: string; content: string }[]>([{ title: "", content: "" }]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  useEffect(() => {
+    if (isEdit && moduleData) {
+      setTitle(moduleData.title || "");
+      setDesc(moduleData.description || "");
+      setStatus(moduleData.isActive ? "active" : "draft");
+      setSectionInputs((moduleData.sections && moduleData.sections.length) ? moduleData.sections.map(s => ({ title: s.title || "", content: s.content || "" })) : [{ title: "", content: "" }]);
+    }
+  }, [isEdit, moduleData]);
 
   const addSection = () => setSectionInputs(prev => [...prev, { title: "", content: "" }]);
   const updateSection = (index: number, field: "title" | "content", value: string) => {
@@ -1235,6 +1244,36 @@ function AdminModuleFormPage({ onNavigate, isEdit = false, onCreateModule }: { o
     const normalizedSections = sectionInputs.filter((section) => section.content.trim());
     if (!normalizedSections.length) {
       setError("Add at least one lesson note before saving the module.");
+      return;
+    }
+
+    // Choose create or update path depending on edit mode
+    if (isEdit) {
+      if (!onUpdateModule) {
+        setError("Module update is currently unavailable.");
+        return;
+      }
+
+      if (!moduleData?._id) {
+        setError("No module selected for update.");
+        return;
+      }
+
+      try {
+        setSaving(true);
+        const data = await onUpdateModule(moduleData._id, {
+          title: title.trim(),
+          description: desc.trim(),
+          status,
+          sections: normalizedSections,
+        });
+        setSuccess(data?.title ? `Module "${data.title}" updated successfully.` : "Module updated successfully.");
+        setTimeout(() => onNavigate("admin-modules"), 600);
+      } catch (err: any) {
+        setError(err.message || "Failed to update module.");
+      } finally {
+        setSaving(false);
+      }
       return;
     }
 
@@ -2239,6 +2278,15 @@ export default function App() {
     return data;
   }, [apiRequest, fetchModules]);
 
+  const updateModule = useCallback(async (id: string, payload: any) => {
+    const data = await apiRequest(`/api/modules/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+    await fetchModules();
+    return data;
+  }, [apiRequest, fetchModules]);
+
   const createQuiz = useCallback(async (payload: any) => {
     const data = await apiRequest("/api/quiz/create", {
       method: "POST",
@@ -2380,9 +2428,9 @@ export default function App() {
       case "results-delayed": return <ResultsPage onNavigate={navigate} result={resultData} delayed />;
       case "admin-login": return <AdminLoginPage onNavigate={navigate} adminLogin={adminLogin} />;
       case "admin-dashboard": return <AdminDashboardPage onNavigate={navigate} metrics={adminMetrics} />;
-      case "admin-modules": return <AdminModulesPage onNavigate={navigate} modules={modulesData} />;
+      case "admin-modules": return <AdminModulesPage onNavigate={navigate} modules={modulesData} onEdit={(m) => { setSelectedModule(m); navigate("admin-module-edit"); }} />;
       case "admin-module-form": return <AdminModuleFormPage onNavigate={navigate} onCreateModule={createModule} />;
-      case "admin-module-edit": return <AdminModuleFormPage onNavigate={navigate} isEdit />;
+      case "admin-module-edit": return <AdminModuleFormPage onNavigate={navigate} isEdit onUpdateModule={updateModule} moduleData={selectedModule} />;
       case "admin-quizzes": return <AdminQuizzesPage onNavigate={navigate} />;
       case "admin-quiz-form": return <AdminQuizFormPage onNavigate={navigate} onCreateQuiz={createQuiz} modules={modulesData} />;
       case "admin-quiz-edit": return <AdminQuizFormPage onNavigate={navigate} isEdit modules={modulesData} />;
