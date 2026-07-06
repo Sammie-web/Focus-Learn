@@ -1210,25 +1210,84 @@ function AdminModulesPage({ onNavigate, modules }: { onNavigate: (p: Page) => vo
 }
 
 // ─── ADMIN MODULE FORM ────────────────────────────────────────────────────────
-function AdminModuleFormPage({ onNavigate, isEdit = false }: { onNavigate: (p: Page) => void; isEdit?: boolean }) {
+function AdminModuleFormPage({ onNavigate, isEdit = false, onCreateModule }: { onNavigate: (p: Page) => void; isEdit?: boolean; onCreateModule?: (payload: any) => Promise<any>; }) {
   const [title, setTitle] = useState(isEdit ? "Introduction to Data Structures" : "");
   const [desc, setDesc] = useState(isEdit ? "Arrays, linked lists, stacks, and queues." : "");
-  const [sections, setSections] = useState(isEdit ? "8" : "");
   const [status, setStatus] = useState(isEdit ? "active" : "draft");
+  const [sectionInputs, setSectionInputs] = useState([{ title: "", content: "" }]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const addSection = () => setSectionInputs(prev => [...prev, { title: "", content: "" }]);
+  const updateSection = (index: number, field: "title" | "content", value: string) => {
+    setSectionInputs(prev => prev.map((section, i) => i === index ? { ...section, [field]: value } : section));
+  };
+
+  const handleSave = async () => {
+    setError("");
+    setSuccess("");
+    if (!title.trim() || !desc.trim()) {
+      setError("Please provide a module title and description.");
+      return;
+    }
+
+    const normalizedSections = sectionInputs.filter((section) => section.content.trim());
+    if (!normalizedSections.length) {
+      setError("Add at least one lesson note before saving the module.");
+      return;
+    }
+
+    if (!onCreateModule) {
+      setError("Module creation is currently unavailable.");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const data = await onCreateModule({
+        title: title.trim(),
+        description: desc.trim(),
+        status,
+        sections: normalizedSections,
+      });
+      setSuccess(data?.title ? `Module "${data.title}" created successfully.` : "Module created successfully.");
+      setTimeout(() => onNavigate("admin-modules"), 600);
+    } catch (err: any) {
+      setError(err.message || "Failed to create module.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="p-6 md:p-8">
       <button onClick={() => onNavigate("admin-modules")} className="flex items-center gap-1 text-sm text-[#9CA3AF] hover:text-[#374151] mb-5 transition-colors">
         <ChevronLeft size={14} />Back to Modules
       </button>
       <h2 className="text-xl font-bold text-[#1A3A5C] mb-6">{isEdit ? "Edit Module" : "Create Module"}</h2>
-      <div className="max-w-lg bg-white border border-[#E5E7EB] rounded-xl p-6 space-y-5">
+      <div className="max-w-2xl bg-white border border-[#E5E7EB] rounded-xl p-6 space-y-5">
         <Field label="Module Title" placeholder="e.g. Introduction to Data Structures" value={title} onChange={setTitle} />
         <div className="space-y-1.5">
           <label className="block text-sm font-medium text-[#374151]">Description</label>
           <textarea value={desc} onChange={e => setDesc(e.target.value)} rows={3} placeholder="Brief module overview..."
             className="w-full px-4 py-2.5 border border-[#E5E7EB] rounded-xl bg-white text-[#374151] placeholder-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#16A085] focus:border-transparent transition-all resize-none text-sm" />
         </div>
-        <Field label="Number of Sections" type="number" placeholder="8" value={sections} onChange={setSections} />
+        <div className="space-y-1.5">
+          <label className="block text-sm font-medium text-[#374151]">Lesson Notes</label>
+          <p className="text-xs text-[#9CA3AF]">Create one or more lesson notes that will be stored as module sections.</p>
+          <div className="space-y-3">
+            {sectionInputs.map((section, index) => (
+              <div key={index} className="border border-[#E5E7EB] rounded-xl p-3 space-y-2">
+                <input value={section.title} onChange={(e) => updateSection(index, "title", e.target.value)} placeholder={`Section ${index + 1} title (optional)`}
+                  className="w-full px-3 py-2 border border-[#E5E7EB] rounded-lg text-sm text-[#374151] placeholder-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#16A085]" />
+                <textarea value={section.content} onChange={(e) => updateSection(index, "content", e.target.value)} rows={3} placeholder="Lesson note content..."
+                  className="w-full px-3 py-2 border border-[#E5E7EB] rounded-lg text-sm text-[#374151] placeholder-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#16A085] resize-none" />
+              </div>
+            ))}
+          </div>
+          <button type="button" onClick={addSection} className="text-sm font-medium text-[#16A085] hover:text-[#13856f]">+ Add another lesson note</button>
+        </div>
         <div className="space-y-1.5">
           <label className="block text-sm font-medium text-[#374151]">Status</label>
           <div className="flex gap-2">
@@ -1240,8 +1299,10 @@ function AdminModuleFormPage({ onNavigate, isEdit = false }: { onNavigate: (p: P
             ))}
           </div>
         </div>
+        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {success ? <p className="text-sm text-[#16A085]">{success}</p> : null}
         <div className="flex gap-3 pt-1">
-          <TealButton onClick={() => onNavigate("admin-modules")} className="flex-1 justify-center">{isEdit ? "Update" : "Save Module"}</TealButton>
+          <TealButton onClick={handleSave} disabled={saving} className="flex-1 justify-center">{saving ? "Saving..." : isEdit ? "Update" : "Save Module"}</TealButton>
           <Btn variant="secondary" onClick={() => onNavigate("admin-modules")} className="justify-center px-5">Cancel</Btn>
         </div>
       </div>
@@ -1292,12 +1353,59 @@ function AdminQuizzesPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
 }
 
 // ─── ADMIN QUIZ FORM ──────────────────────────────────────────────────────────
-function AdminQuizFormPage({ onNavigate, isEdit = false }: { onNavigate: (p: Page) => void; isEdit?: boolean }) {
+function AdminQuizFormPage({ onNavigate, isEdit = false, onCreateQuiz, modules }: { onNavigate: (p: Page) => void; isEdit?: boolean; onCreateQuiz?: (payload: any) => Promise<any>; modules: ModuleItem[]; }) {
   const [currentQ, setCurrentQ] = useState(0);
-  const [questionText, setQuestionText] = useState(isEdit ? quizQuestions[0].question : "");
-  const [options, setOptions] = useState(isEdit ? [...quizQuestions[0].options] : ["", "", "", ""]);
-  const [correct, setCorrect] = useState(isEdit ? quizQuestions[0].correct : 0);
-  const [explanation, setExplanation] = useState(isEdit ? "A stack follows LIFO — the last item pushed is the first to be popped." : "");
+  const [moduleId, setModuleId] = useState((modules[0]?._id || modules[0]?.id || ""));
+  const [quizType, setQuizType] = useState("Immediate Recall");
+  const [questions, setQuestions] = useState([{ questionText: "", options: ["", "", "", ""], correctAnswerIndex: 0, explanation: "" }]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const updateCurrentQuestion = (patch: Partial<{ questionText: string; options: string[]; correctAnswerIndex: number; explanation: string }>) => {
+    setQuestions(prev => prev.map((question, index) => index === currentQ ? { ...question, ...patch } : question));
+  };
+
+  const addQuestion = () => {
+    setQuestions(prev => [...prev, { questionText: "", options: ["", "", "", ""], correctAnswerIndex: 0, explanation: "" }]);
+    setCurrentQ(questions.length);
+  };
+
+  const handleSave = async () => {
+    setError("");
+    setSuccess("");
+    const normalizedQuestions = questions.filter((question) => question.questionText.trim());
+    if (!moduleId || !normalizedQuestions.length) {
+      setError("Select a module and add at least one quiz question.");
+      return;
+    }
+
+    if (!onCreateQuiz) {
+      setError("Quiz creation is currently unavailable.");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const data = await onCreateQuiz({
+        moduleId,
+        quizType: quizType.toLowerCase().includes("delayed") ? "delayed" : "immediate",
+        questions: normalizedQuestions.map((question) => ({
+          questionText: question.questionText,
+          options: question.options,
+          correctAnswerIndex: question.correctAnswerIndex,
+          explanation: question.explanation,
+        })),
+      });
+      setSuccess(data?.questions?.length ? `Saved ${data.questions.length} quiz question(s).` : "Quiz created successfully.");
+      setTimeout(() => onNavigate("admin-quizzes"), 600);
+    } catch (err: any) {
+      setError(err.message || "Failed to create quiz.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="p-6 md:p-8">
       <button onClick={() => onNavigate("admin-quizzes")} className="flex items-center gap-1 text-sm text-[#9CA3AF] hover:text-[#374151] mb-5 transition-colors">
@@ -1309,20 +1417,23 @@ function AdminQuizFormPage({ onNavigate, isEdit = false }: { onNavigate: (p: Pag
           <h3 className="font-semibold text-[#1A3A5C] text-sm border-b border-[#E5E7EB] pb-3">Quiz Settings</h3>
           <div className="space-y-1.5">
             <label className="block text-sm font-medium text-[#374151]">Module</label>
-            <select className="w-full px-3 py-2.5 border border-[#E5E7EB] rounded-xl text-sm text-[#374151] bg-white focus:outline-none focus:ring-2 focus:ring-[#16A085]">
-              {modules.map(m => <option key={m.id}>{m.title}</option>)}
+            <select value={moduleId} onChange={(e) => setModuleId(e.target.value)} className="w-full px-3 py-2.5 border border-[#E5E7EB] rounded-xl text-sm text-[#374151] bg-white focus:outline-none focus:ring-2 focus:ring-[#16A085]">
+              {modules.map(m => <option key={m._id || m.id} value={m._id || m.id}>{m.title}</option>)}
             </select>
           </div>
           <div className="space-y-1.5">
             <label className="block text-sm font-medium text-[#374151]">Quiz Type</label>
-            <select className="w-full px-3 py-2.5 border border-[#E5E7EB] rounded-xl text-sm text-[#374151] bg-white focus:outline-none focus:ring-2 focus:ring-[#16A085]">
+            <select value={quizType} onChange={(e) => setQuizType(e.target.value)} className="w-full px-3 py-2.5 border border-[#E5E7EB] rounded-xl text-sm text-[#374151] bg-white focus:outline-none focus:ring-2 focus:ring-[#16A085]">
               <option>Immediate Recall</option>
               <option>Delayed Recall</option>
             </select>
           </div>
-          <Field label="Number of Questions" type="number" value="20" onChange={() => {}} />
+          <div className="space-y-1.5">
+            <label className="block text-sm font-medium text-[#374151]">Questions</label>
+            <button type="button" onClick={addQuestion} className="w-full text-sm font-medium text-[#16A085] border border-[#E5E7EB] rounded-xl py-2 hover:bg-[#F0FBF8]">+ Add question</button>
+          </div>
           <div className="space-y-1 pt-1">
-            {quizQuestions.map((_, i) => (
+            {questions.map((_, i) => (
               <button key={i} onClick={() => setCurrentQ(i)}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors ${currentQ === i ? "bg-[#F0FBF8] text-[#16A085]" : "text-[#6B7280] hover:bg-[#F9FAFB]"}`}>
                 <span>Question {i + 1}</span>
@@ -1335,33 +1446,39 @@ function AdminQuizFormPage({ onNavigate, isEdit = false }: { onNavigate: (p: Pag
           <h3 className="font-semibold text-[#1A3A5C] text-sm border-b border-[#E5E7EB] pb-3">Question {currentQ + 1}</h3>
           <div className="space-y-1.5">
             <label className="block text-sm font-medium text-[#374151]">Question</label>
-            <textarea value={questionText} onChange={e => setQuestionText(e.target.value)} rows={2}
+            <textarea value={questions[currentQ]?.questionText || ""} onChange={(e) => updateCurrentQuestion({ questionText: e.target.value })} rows={2}
               placeholder="Enter your question here..."
               className="w-full px-4 py-2.5 border border-[#E5E7EB] rounded-xl bg-white text-[#374151] placeholder-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#16A085] transition-all resize-none text-sm" />
           </div>
           <div className="space-y-2.5">
             <label className="block text-sm font-medium text-[#374151]">Answer Options <span className="text-[#9CA3AF] font-normal text-xs">(click circle to mark correct)</span></label>
-            {options.map((opt, i) => (
+            {(questions[currentQ]?.options || []).map((opt, i) => (
               <div key={i} className="flex items-center gap-2.5">
-                <button onClick={() => setCorrect(i)}
-                  className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${correct === i ? "border-[#16A085]" : "border-[#D1D5DB]"}`}>
-                  {correct === i && <div className="w-2.5 h-2.5 rounded-full bg-[#16A085]" />}
+                <button type="button" onClick={() => updateCurrentQuestion({ correctAnswerIndex: i })}
+                  className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${(questions[currentQ]?.correctAnswerIndex ?? 0) === i ? "border-[#16A085]" : "border-[#D1D5DB]"}`}>
+                  {(questions[currentQ]?.correctAnswerIndex ?? 0) === i && <div className="w-2.5 h-2.5 rounded-full bg-[#16A085]" />}
                 </button>
                 <input type="text" value={opt} placeholder={`Option ${i + 1}`}
-                  onChange={e => { const o = [...options]; o[i] = e.target.value; setOptions(o); }}
+                  onChange={(e) => {
+                    const nextOptions = [...(questions[currentQ]?.options || [])];
+                    nextOptions[i] = e.target.value;
+                    updateCurrentQuestion({ options: nextOptions });
+                  }}
                   className="flex-1 px-3 py-2 border border-[#E5E7EB] rounded-xl text-sm text-[#374151] placeholder-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#16A085]" />
-                {correct === i && <Badge text="Correct" color="green" />}
+                {(questions[currentQ]?.correctAnswerIndex ?? 0) === i && <Badge text="Correct" color="green" />}
               </div>
             ))}
           </div>
           <div className="space-y-1.5">
             <label className="block text-sm font-medium text-[#374151]">Explanation <span className="text-[#9CA3AF] font-normal text-xs">(optional)</span></label>
-            <textarea value={explanation} onChange={e => setExplanation(e.target.value)} rows={2}
+            <textarea value={questions[currentQ]?.explanation || ""} onChange={(e) => updateCurrentQuestion({ explanation: e.target.value })} rows={2}
               placeholder="Why is this the correct answer?"
               className="w-full px-4 py-2.5 border border-[#E5E7EB] rounded-xl bg-white text-[#374151] placeholder-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#16A085] transition-all resize-none text-sm" />
           </div>
+          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          {success ? <p className="text-sm text-[#16A085]">{success}</p> : null}
           <div className="flex gap-3 pt-1">
-            <TealButton onClick={() => onNavigate("admin-quizzes")} className="flex-1 justify-center">{isEdit ? "Update Quiz" : "Save Quiz"}</TealButton>
+            <TealButton onClick={handleSave} disabled={saving} className="flex-1 justify-center">{saving ? "Saving..." : isEdit ? "Update Quiz" : "Save Quiz"}</TealButton>
             <Btn variant="secondary" onClick={() => onNavigate("admin-quizzes")} className="justify-center px-5">Cancel</Btn>
           </div>
         </div>
@@ -2113,6 +2230,23 @@ export default function App() {
     return data;
   }, [apiRequest, saveAuth, showToast]);
 
+  const createModule = useCallback(async (payload: any) => {
+    const data = await apiRequest("/api/modules", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    await fetchModules();
+    return data;
+  }, [apiRequest, fetchModules]);
+
+  const createQuiz = useCallback(async (payload: any) => {
+    const data = await apiRequest("/api/quiz/create", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    return data;
+  }, [apiRequest]);
+
   const fetchAdminDashboard = useCallback(async () => {
     try {
       const data = await apiRequest("/api/admin/dashboard");
@@ -2247,11 +2381,11 @@ export default function App() {
       case "admin-login": return <AdminLoginPage onNavigate={navigate} adminLogin={adminLogin} />;
       case "admin-dashboard": return <AdminDashboardPage onNavigate={navigate} metrics={adminMetrics} />;
       case "admin-modules": return <AdminModulesPage onNavigate={navigate} modules={modulesData} />;
-      case "admin-module-form": return <AdminModuleFormPage onNavigate={navigate} />;
+      case "admin-module-form": return <AdminModuleFormPage onNavigate={navigate} onCreateModule={createModule} />;
       case "admin-module-edit": return <AdminModuleFormPage onNavigate={navigate} isEdit />;
       case "admin-quizzes": return <AdminQuizzesPage onNavigate={navigate} />;
-      case "admin-quiz-form": return <AdminQuizFormPage onNavigate={navigate} />;
-      case "admin-quiz-edit": return <AdminQuizFormPage onNavigate={navigate} isEdit />;
+      case "admin-quiz-form": return <AdminQuizFormPage onNavigate={navigate} onCreateQuiz={createQuiz} modules={modulesData} />;
+      case "admin-quiz-edit": return <AdminQuizFormPage onNavigate={navigate} isEdit modules={modulesData} />;
       case "admin-participants": return <AdminParticipantsPage onNavigate={navigate} participants={adminParticipants} />;
       case "admin-assign-groups": return <AdminAssignGroupsPage onNavigate={navigate} />;
       case "admin-analytics": return <AdminAnalyticsPage analytics={adminAnalytics} />;
