@@ -76,12 +76,6 @@ const participants = [
   { id: "8", name: "Jide Olawale", email: "jide@ui.edu.ng", device: "Mobile", group: "Control", status: "Active" },
 ];
 
-const quizQuestions = [
-  { id: 1, question: "Which data structure operates on a Last-In-First-Out (LIFO) principle?", options: ["Queue", "Stack", "Linked List", "Binary Tree"], correct: 1 },
-  { id: 2, question: "What is the time complexity of binary search on a sorted array?", options: ["O(n)", "O(n²)", "O(log n)", "O(1)"], correct: 2 },
-  { id: 3, question: "Which sorting algorithm has the best average-case time complexity of O(n log n)?", options: ["Bubble Sort", "Selection Sort", "Insertion Sort", "Merge Sort"], correct: 3 },
-];
-
 const lessonContent = [
   {
     title: "What is a Data Structure?",
@@ -120,12 +114,6 @@ const adminResultsData = [
   { participant: "Funmilayo Adeyemi", group: "Control", immediate: 65, delayed: 51, nasaTlx: 61, time: "64m" },
   { participant: "Gbenga Okafor", group: "Experimental", immediate: 80, delayed: 75, nasaTlx: 41, time: "45m" },
   { participant: "Hauwa Ibrahim", group: "Control", immediate: 72, delayed: 60, nasaTlx: 53, time: "55m" },
-];
-
-const quizData = [
-  { id: "1", name: "Module 1 – Immediate Recall", module: "Introduction to Data Structures", type: "Immediate", questions: 20 },
-  { id: "2", name: "Module 1 – Delayed Recall", module: "Introduction to Data Structures", type: "Delayed", questions: 20 },
-  { id: "3", name: "Module 2 – Immediate Recall", module: "Algorithms and Complexity", type: "Immediate", questions: 20 },
 ];
 
 // ─── SKELETON COMPONENTS ──────────────────────────────────────────────────────
@@ -1350,13 +1338,24 @@ function AdminModuleFormPage({ onNavigate, isEdit = false, onCreateModule, onUpd
 }
 
 // ─── ADMIN QUIZZES ────────────────────────────────────────────────────────────
-function AdminQuizzesPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
+function AdminQuizzesPage({ onNavigate, quizSummary, modules, onEditQuiz }: { onNavigate: (p: Page) => void; quizSummary: QuizSummaryItem[]; modules: ModuleItem[]; onEditQuiz: (quiz: QuizSummaryItem) => void; }) {
+  const displayQuizzes = quizSummary.map((q, index) => {
+    const module = modules.find((m) => m._id === q.moduleId);
+    return {
+      ...q,
+      id: q.id || `${q.moduleId}-${q.quizType}-${index}`,
+      name: q.name || `${module?.title || 'Module'} – ${q.quizType === 'delayed' ? 'Delayed' : 'Immediate'} Recall`,
+      module: q.module || module?.title || 'Unknown module',
+      type: q.type || (q.quizType === 'delayed' ? 'Delayed' : 'Immediate'),
+    } as QuizSummaryItem & { id: string; name: string; module: string; type: string };
+  });
+
   return (
     <div className="p-6 md:p-8">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-xl font-bold text-[#1A3A5C]">Quizzes</h2>
-          <p className="text-sm text-[#9CA3AF] mt-0.5">{quizData.length} quizzes</p>
+          <p className="text-sm text-[#9CA3AF] mt-0.5">{displayQuizzes.length} quizzes</p>
         </div>
         <TealButton onClick={() => onNavigate("admin-quiz-form")} icon={<Plus size={15} />}>New Quiz</TealButton>
       </div>
@@ -1370,7 +1369,7 @@ function AdminQuizzesPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
             </tr>
           </thead>
           <tbody>
-            {quizData.map(q => (
+            {displayQuizzes.map(q => (
               <tr key={q.id} className="border-b border-[#E5E7EB] last:border-0 hover:bg-[#F9FAFB] transition-colors">
                 <td className="px-4 py-4 font-semibold text-[#1A3A5C] text-sm">{q.name}</td>
                 <td className="px-4 py-4 text-xs text-[#6B7280]">{q.module}</td>
@@ -1378,7 +1377,7 @@ function AdminQuizzesPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
                 <td className="px-4 py-4 text-sm text-[#374151]">{q.questions}</td>
                 <td className="px-4 py-4">
                   <div className="flex gap-1">
-                    <button onClick={() => onNavigate("admin-quiz-edit")} className="p-1.5 rounded-lg hover:bg-[#F3F4F6] text-[#9CA3AF] hover:text-[#374151] transition-colors"><Edit2 size={13} /></button>
+                    <button onClick={() => onEditQuiz(q)} className="p-1.5 rounded-lg hover:bg-[#F3F4F6] text-[#9CA3AF] hover:text-[#374151] transition-colors"><Edit2 size={13} /></button>
                     <button className="p-1.5 rounded-lg hover:bg-red-50 text-[#9CA3AF] hover:text-red-600 transition-colors"><Trash2 size={13} /></button>
                   </div>
                 </td>
@@ -1392,14 +1391,24 @@ function AdminQuizzesPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
 }
 
 // ─── ADMIN QUIZ FORM ──────────────────────────────────────────────────────────
-function AdminQuizFormPage({ onNavigate, isEdit = false, onCreateQuiz, modules }: { onNavigate: (p: Page) => void; isEdit?: boolean; onCreateQuiz?: (payload: any) => Promise<any>; modules: ModuleItem[]; }) {
+function AdminQuizFormPage({ onNavigate, isEdit = false, onCreateQuiz, onUpdateQuiz, modules, quizData, initialQuestions }: { onNavigate: (p: Page) => void; isEdit?: boolean; onCreateQuiz?: (payload: any) => Promise<any>; onUpdateQuiz?: (moduleId: string, payload: any) => Promise<any>; modules: ModuleItem[]; quizData?: QuizSummaryItem | null; initialQuestions?: QuestionFormItem[]; }) {
   const [currentQ, setCurrentQ] = useState(0);
   const [moduleId, setModuleId] = useState((modules[0]?._id || modules[0]?.id || ""));
   const [quizType, setQuizType] = useState("Immediate Recall");
-  const [questions, setQuestions] = useState([{ questionText: "", options: ["", "", "", ""], correctAnswerIndex: 0, explanation: "" }]);
+  const [questions, setQuestions] = useState<QuestionFormItem[]>([{ questionText: "", options: ["", "", "", ""], correctAnswerIndex: 0, explanation: "" }]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  useEffect(() => {
+    if (!isEdit || !quizData) return;
+    setModuleId(quizData.moduleId || (modules[0]?._id || modules[0]?.id || ""));
+    setQuizType(quizData.quizType === "delayed" ? "Delayed Recall" : "Immediate Recall");
+    if (initialQuestions && initialQuestions.length) {
+      setQuestions(initialQuestions);
+      setCurrentQ(0);
+    }
+  }, [isEdit, quizData, initialQuestions, modules]);
 
   const updateCurrentQuestion = (patch: Partial<{ questionText: string; options: string[]; correctAnswerIndex: number; explanation: string }>) => {
     setQuestions(prev => prev.map((question, index) => index === currentQ ? { ...question, ...patch } : question));
@@ -1416,6 +1425,34 @@ function AdminQuizFormPage({ onNavigate, isEdit = false, onCreateQuiz, modules }
     const normalizedQuestions = questions.filter((question) => question.questionText.trim());
     if (!moduleId || !normalizedQuestions.length) {
       setError("Select a module and add at least one quiz question.");
+      return;
+    }
+
+    if (isEdit) {
+      if (!onUpdateQuiz) {
+        setError("Quiz update is currently unavailable.");
+        return;
+      }
+
+      try {
+        setSaving(true);
+        const data = await onUpdateQuiz(quizData?.moduleId || moduleId, {
+          moduleId,
+          quizType: quizType.toLowerCase().includes("delayed") ? "delayed" : "immediate",
+          questions: normalizedQuestions.map((question) => ({
+            questionText: question.questionText,
+            options: question.options,
+            correctAnswerIndex: question.correctAnswerIndex,
+            explanation: question.explanation,
+          })),
+        });
+        setSuccess(data?.questions?.length ? `Saved ${data.questions.length} quiz question(s).` : "Quiz updated successfully.");
+        setTimeout(() => onNavigate("admin-quizzes"), 600);
+      } catch (err: any) {
+        setError(err.message || "Failed to update quiz.");
+      } finally {
+        setSaving(false);
+      }
       return;
     }
 
@@ -1977,10 +2014,14 @@ type AuthState = { user: AuthUser | null; token: string; refreshToken: string; }
 type ToastData = { message: string; type: "success" | "error" | "info"; };
 type ModuleItem = { _id: string; title: string; description: string; sections?: { title: string; content: string }[]; isActive?: boolean; progress?: number; lessons?: number; quizzes?: number; status?: string; };
 type QuizQuestionItem = { _id: string; questionNumber: number; question: string; options: string[]; };
+type QuizSummaryItem = { moduleId: string; quizType: 'immediate' | 'delayed'; questions: number; id?: string; name?: string; module?: string; type?: string; };
+
+type QuestionFormItem = { questionText: string; options: string[]; correctAnswerIndex: number; explanation: string; };
 
 const normalizeApiBase = (base: string) => base.replace(/\/*$/, "");
 const API_BASES = [
   (import.meta as any).env?.VITE_API_BASE,
+  "http://localhost:3001",
   "http://localhost:5001",
   "http://localhost:5000",
   "https://focus-learn-backend.vercel.app"
@@ -2060,6 +2101,9 @@ export default function App() {
   const [modulesData, setModulesData] = useState<ModuleItem[]>([]);
   const [selectedModule, setSelectedModule] = useState<ModuleItem | null>(null);
   const [moduleQuestions, setModuleQuestions] = useState<QuizQuestionItem[]>([]);
+  const [quizSummaryData, setQuizSummaryData] = useState<QuizSummaryItem[]>([]);
+  const [selectedQuiz, setSelectedQuiz] = useState<QuizSummaryItem | null>(null);
+  const [selectedQuizQuestions, setSelectedQuizQuestions] = useState<QuestionFormItem[]>([]);
   const [resultData, setResultData] = useState<any>(null);
   const [adminMetrics, setAdminMetrics] = useState<any>(null);
   const [adminParticipants, setAdminParticipants] = useState<any[]>([]);
@@ -2151,10 +2195,29 @@ export default function App() {
     }
   }, [apiRequest, showToast]);
 
+  const fetchQuizSummary = useCallback(async () => {
+    try {
+      const data = await apiRequest("/api/quiz/summary");
+      setQuizSummaryData(data);
+    } catch (error: any) {
+      showToast(error.message || "Failed to load quiz summary", "error");
+    }
+  }, [apiRequest, showToast]);
+
   const fetchQuestions = useCallback(async (moduleId: string) => {
     try {
       const data = await apiRequest(`/api/quiz/${moduleId}`);
       setModuleQuestions(data);
+      return data;
+    } catch (error: any) {
+      showToast(error.message || "Failed to load quiz questions", "error");
+      return [];
+    }
+  }, [apiRequest, showToast]);
+
+  const fetchQuizQuestionsByType = useCallback(async (moduleId: string, quizType: string) => {
+    try {
+      const data = await apiRequest(`/api/quiz/${moduleId}?quizType=${encodeURIComponent(quizType)}`);
       return data;
     } catch (error: any) {
       showToast(error.message || "Failed to load quiz questions", "error");
@@ -2292,8 +2355,30 @@ export default function App() {
       method: "POST",
       body: JSON.stringify(payload),
     });
+    await fetchQuizSummary();
     return data;
-  }, [apiRequest]);
+  }, [apiRequest, fetchQuizSummary]);
+
+  const updateQuiz = useCallback(async (moduleId: string, payload: any) => {
+    const data = await apiRequest(`/api/quiz/${moduleId}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+    await fetchQuizSummary();
+    return data;
+  }, [apiRequest, fetchQuizSummary]);
+
+  const editQuiz = useCallback(async (quiz: QuizSummaryItem) => {
+    setSelectedQuiz(quiz);
+    const questions = await fetchQuizQuestionsByType(quiz.moduleId, quiz.quizType);
+    setSelectedQuizQuestions(questions.map((q: any) => ({
+      questionText: q.questionText || "",
+      options: q.options || ["", "", "", ""],
+      correctAnswerIndex: q.correctAnswerIndex ?? 0,
+      explanation: q.explanation || "",
+    })));
+    setRoute({ page: "admin-quiz-edit" });
+  }, [fetchQuizQuestionsByType]);
 
   const fetchAdminDashboard = useCallback(async () => {
     try {
@@ -2365,7 +2450,10 @@ export default function App() {
     if (route.page === "admin-results") {
       fetchAdminResults();
     }
-  }, [route.page, auth.token, fetchAdminDashboard, fetchAdminAnalytics, fetchAdminParticipants, fetchAdminResults]);
+    if (route.page === "admin-quizzes") {
+      fetchQuizSummary();
+    }
+  }, [route.page, auth.token, fetchAdminDashboard, fetchAdminAnalytics, fetchAdminParticipants, fetchAdminResults, fetchQuizSummary]);
 
   const navigate = useCallback((page: Page) => {
     // Check if user can access the requested page
@@ -2431,9 +2519,9 @@ export default function App() {
       case "admin-modules": return <AdminModulesPage onNavigate={navigate} modules={modulesData} onEdit={(m) => { setSelectedModule(m); navigate("admin-module-edit"); }} />;
       case "admin-module-form": return <AdminModuleFormPage onNavigate={navigate} onCreateModule={createModule} />;
       case "admin-module-edit": return <AdminModuleFormPage onNavigate={navigate} isEdit onUpdateModule={updateModule} moduleData={selectedModule} />;
-      case "admin-quizzes": return <AdminQuizzesPage onNavigate={navigate} />;
+      case "admin-quizzes": return <AdminQuizzesPage onNavigate={navigate} modules={modulesData} quizSummary={quizSummaryData} onEditQuiz={editQuiz} />;
       case "admin-quiz-form": return <AdminQuizFormPage onNavigate={navigate} onCreateQuiz={createQuiz} modules={modulesData} />;
-      case "admin-quiz-edit": return <AdminQuizFormPage onNavigate={navigate} isEdit modules={modulesData} />;
+      case "admin-quiz-edit": return <AdminQuizFormPage onNavigate={navigate} isEdit onUpdateQuiz={updateQuiz} modules={modulesData} quizData={selectedQuiz} initialQuestions={selectedQuizQuestions} />;
       case "admin-participants": return <AdminParticipantsPage onNavigate={navigate} participants={adminParticipants} />;
       case "admin-assign-groups": return <AdminAssignGroupsPage onNavigate={navigate} />;
       case "admin-analytics": return <AdminAnalyticsPage analytics={adminAnalytics} />;
