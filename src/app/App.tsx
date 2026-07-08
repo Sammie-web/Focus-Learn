@@ -1630,10 +1630,51 @@ function AdminParticipantsPage({ onNavigate, participants }: { onNavigate: (p: P
 }
 
 // ─── ASSIGN GROUPS ────────────────────────────────────────────────────────────
-function AdminAssignGroupsPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
+function AdminAssignGroupsPage({ onNavigate, participants, onAssignGroups }: { onNavigate: (p: Page) => void; participants: any[]; onAssignGroups?: (participantIds: string[], group: "Control" | "Experimental") => Promise<any>; }) {
   const [selected, setSelected] = useState<string[]>([]);
   const [target, setTarget] = useState<"Control" | "Experimental">("Experimental");
-  const toggle = (id: string) => setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const toggle = (id: string) => {
+    setError("");
+    setSuccess("");
+    setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const selectedParticipants = (participants || []).filter((p) => selected.includes(p._id || p.id));
+  const normalizedTarget = target.toLowerCase();
+  const targetCount = (participants || []).filter((p) => (p.group || "").toString().toLowerCase() === normalizedTarget).length;
+  const otherGroup = target === "Control" ? "Experimental" : "Control";
+  const otherCount = (participants || []).filter((p) => (p.group || "").toString().toLowerCase() === otherGroup.toLowerCase()).length;
+  const movedFromTarget = selectedParticipants.filter((p) => (p.group || "").toString().toLowerCase() === normalizedTarget).length;
+  const movedFromOther = selectedParticipants.filter((p) => (p.group || "").toString().toLowerCase() === otherGroup.toLowerCase()).length;
+  const projectedTargetCount = targetCount + selectedParticipants.length - movedFromTarget;
+  const projectedOtherCount = otherCount - movedFromOther;
+  const canAssign = selected.length > 0 && projectedTargetCount >= 5 && projectedTargetCount <= 8 && projectedOtherCount >= 5 && projectedOtherCount <= 8;
+
+  const handleAssign = async () => {
+    if (!onAssignGroups || selected.length === 0) return;
+    if (!canAssign) {
+      setError(`Each group must stay between 5 and 8 participants. Current preview would be ${projectedTargetCount} in ${target} and ${projectedOtherCount} in ${otherGroup}.`);
+      return;
+    }
+
+    try {
+      setSaving(true);
+      setError("");
+      await onAssignGroups(selected, target);
+      setSelected([]);
+      setSuccess(`${selected.length} participant(s) assigned to ${target} group.`);
+      setTimeout(() => onNavigate("admin-participants"), 600);
+    } catch (err: any) {
+      setError(err.message || "Failed to assign groups.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="p-6 md:p-8">
       <button onClick={() => onNavigate("admin-participants")} className="flex items-center gap-1 text-sm text-[#9CA3AF] hover:text-[#374151] mb-5 transition-colors">
@@ -1653,15 +1694,19 @@ function AdminAssignGroupsPage({ onNavigate }: { onNavigate: (p: Page) => void }
             ))}
           </div>
           <div className="p-4 bg-[#F9FAFB] rounded-xl space-y-3">
-            {[{ label: "Control Group", val: 100, color: "navy" as const }, { label: "Experimental Group", val: 100, color: "teal" as const }].map(g => (
-              <div key={g.label}>
-                <div className="flex justify-between text-xs text-[#6B7280] mb-1.5">
-                  <span>{g.label}</span><span>24 / 24</span>
+            {(["Control", "Experimental"] as const).map((g) => {
+              const count = (participants || []).filter((p) => (p.group || "").toString().toLowerCase() === g.toLowerCase()).length;
+              return (
+                <div key={g}>
+                  <div className="flex justify-between text-xs text-[#6B7280] mb-1.5">
+                    <span>{g} Group</span><span>{count} / 8</span>
+                  </div>
+                  <ProgressBar value={Math.min(100, Math.round((count / 8) * 100))} color={g === "Experimental" ? "teal" : "navy"} />
                 </div>
-                <ProgressBar value={g.val} color={g.color} />
-              </div>
-            ))}
+              );
+            })}
           </div>
+          {(error || success) ? <div className={`mt-4 text-sm ${error ? "text-red-600" : "text-[#16A085]"}`}>{error || success}</div> : null}
         </div>
         <div className="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden flex flex-col">
           <div className="px-4 py-3 border-b border-[#E5E7EB] flex items-center justify-between">
@@ -1669,23 +1714,29 @@ function AdminAssignGroupsPage({ onNavigate }: { onNavigate: (p: Page) => void }
             <span className="text-xs text-[#9CA3AF]">{selected.length} selected</span>
           </div>
           <div className="flex-1 divide-y divide-[#E5E7EB] overflow-y-auto">
-            {participants.map(p => (
-              <label key={p.id} className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[#F9FAFB] transition-colors">
-                <div onClick={() => toggle(p.id)}
-                  className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all shrink-0 ${selected.includes(p.id) ? "bg-[#16A085] border-[#16A085]" : "border-[#D1D5DB]"}`}>
-                  {selected.includes(p.id) && <Check size={9} className="text-white" />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-[#1A3A5C] truncate">{p.name}</p>
-                  <p className="text-xs text-[#9CA3AF]">{p.email}</p>
-                </div>
-                <Badge text={p.group} color={p.group === "Experimental" ? "blue" : "gray"} />
-              </label>
-            ))}
+            {(participants || []).map((p) => {
+              const id = p._id || p.id;
+              const isSelected = selected.includes(id);
+              const normalizedGroup = (p.group || "").toString().toLowerCase();
+              const displayGroup = normalizedGroup === "experimental" ? "Experimental" : normalizedGroup === "control" ? "Control" : "Unassigned";
+              return (
+                <label key={id} className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[#F9FAFB] transition-colors">
+                  <div onClick={() => toggle(id)}
+                    className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all shrink-0 ${isSelected ? "bg-[#16A085] border-[#16A085]" : "border-[#D1D5DB]"}`}>
+                    {isSelected && <Check size={9} className="text-white" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-[#1A3A5C] truncate">{p.fullName || p.name}</p>
+                    <p className="text-xs text-[#9CA3AF]">{p.email}</p>
+                  </div>
+                  <Badge text={displayGroup} color={displayGroup === "Experimental" ? "blue" : displayGroup === "Control" ? "gray" : "yellow"} />
+                </label>
+              );
+            })}
           </div>
           <div className="px-4 py-3 border-t border-[#E5E7EB]">
-            <TealButton disabled={selected.length === 0} onClick={() => { setSelected([]); onNavigate("admin-participants"); }} className="w-full justify-center">
-              Assign {selected.length > 0 ? `(${selected.length})` : ""} to {target}
+            <TealButton disabled={selected.length === 0 || saving || !canAssign} onClick={handleAssign} className="w-full justify-center">
+              {saving ? "Assigning..." : `Assign ${selected.length > 0 ? `(${selected.length})` : ""} to ${target}`}
             </TealButton>
           </div>
         </div>
@@ -2398,6 +2449,15 @@ export default function App() {
     }
   }, [apiRequest, showToast]);
 
+  const assignGroups = useCallback(async (participantIds: string[], group: "Control" | "Experimental") => {
+    const data = await apiRequest("/api/admin/participants/assign", {
+      method: "POST",
+      body: JSON.stringify({ participantIds, group: group.toLowerCase() }),
+    });
+    await fetchAdminParticipants();
+    return data;
+  }, [apiRequest, fetchAdminParticipants]);
+
   const fetchAdminResults = useCallback(async () => {
     try {
       const data = await apiRequest("/api/admin/results");
@@ -2444,7 +2504,7 @@ export default function App() {
     if (route.page === "admin-analytics") {
       fetchAdminAnalytics();
     }
-    if (route.page === "admin-participants") {
+    if (route.page === "admin-participants" || route.page === "admin-assign-groups") {
       fetchAdminParticipants();
     }
     if (route.page === "admin-results") {
@@ -2523,7 +2583,7 @@ export default function App() {
       case "admin-quiz-form": return <AdminQuizFormPage onNavigate={navigate} onCreateQuiz={createQuiz} modules={modulesData} />;
       case "admin-quiz-edit": return <AdminQuizFormPage onNavigate={navigate} isEdit onUpdateQuiz={updateQuiz} modules={modulesData} quizData={selectedQuiz} initialQuestions={selectedQuizQuestions} />;
       case "admin-participants": return <AdminParticipantsPage onNavigate={navigate} participants={adminParticipants} />;
-      case "admin-assign-groups": return <AdminAssignGroupsPage onNavigate={navigate} />;
+      case "admin-assign-groups": return <AdminAssignGroupsPage onNavigate={navigate} participants={adminParticipants} onAssignGroups={assignGroups} />;
       case "admin-analytics": return <AdminAnalyticsPage analytics={adminAnalytics} />;
       case "admin-results": return <AdminResultsPage results={adminResults} />;
       case "admin-export": return <AdminExportPage />;
