@@ -1,0 +1,173 @@
+================================================================================
+                      FOCUSLEARN FRONTEND - COMPLETE SOURCE + DOCUMENTATION
+================================================================================
+
+PROJECT METADATA
+================================================================================
+Name:           FocusLearn Frontend
+Version:        1.0.0
+Framework:      React + TypeScript + Vite
+Styling:        Tailwind CSS + custom CSS
+Purpose:        Client application for FocusLearn research platform (UI for students and admin)
+Entry:          src/main.tsx
+Dev Server:     Vite (npm run dev)
+
+RUNNING THE APP
+================================================================================
+1. Install dependencies:
+   npm install
+2. Start dev server:
+   npm run dev
+3. Build for production:
+   npm run build
+
+DEPENDENCIES (from package.json)
+================================================================================
+- React / React DOM (peerDependencies)
+- Vite (dev)
+- @vitejs/plugin-react (dev)
+- Tailwind and @tailwindcss/vite
+- @radix-ui/* UI primitives
+- MUI (material) and emotion
+- lucide-react icons
+- motion/react for animations
+- react-router for routing
+- recharts for charts
+- various UI helper libraries (clsx, class-variance-authority, sonner, etc.)
+
+PROJECT STRUCTURE (frontend-relevant)
+================================================================================
+src/
+  main.tsx                 # App entry - mounts React app
+  app/
+    App.tsx                # Main application layout + routing + global state
+    components/
+      figma/
+        ImageWithFallback.tsx
+      ui/                   # Reusable UI primitives (accordion, alert, button, chart, form, table, etc.)
+        accordion.tsx
+        alert-dialog.tsx
+        alert.tsx
+        aspect-ratio.tsx
+        avatar.tsx
+        badge.tsx
+        breadcrumb.tsx
+        button.tsx
+        calendar.tsx
+        card.tsx
+        carousel.tsx
+        chart.tsx
+        checkbox.tsx
+        collapsible.tsx
+        command.tsx
+        context-menu.tsx
+        dialog.tsx
+        drawer.tsx
+        dropdown-menu.tsx
+        form.tsx
+        hover-card.tsx
+        input.tsx
+        textarea.tsx
+        table.tsx
+        sidebar.tsx
+        pagination.tsx
+        progress.tsx
+        skeleton.tsx
+        tooltip.tsx
+        and many more utility components
+    imports/
+      pasted_text/focuslearn-design-spec.md  # design notes from Figma
+  styles/
+    globals.css
+    index.css
+    tailwind.css
+    theme.css
+    fonts.css
+
+KEY FILES (short descriptions)
+================================================================================
+- src/main.tsx: mounts <App /> and imports global styles.
+- src/app/App.tsx: provides the main UI layout, global CSS injection, sample data and many reusable components (TealButton, Field, PasswordField, ProgressBar, StatCard), skeleton loaders, charts and dashboards. This file is a large single-file application used for prototyping the UI.
+- src/app/components/ui/*: collection of small, focused UI primitives used across the app. Each component follows a consistent design system and uses Tailwind classes.
+- src/styles/*: Tailwind and custom CSS variables, global styles and font imports.
+
+FRONTEND ARCHITECTURE
+================================================================================
+- Vite development server serves the app (fast HMR).
+- App is a single-page React application.
+- Component-driven architecture: small reusable primitives in src/app/components/ui, larger page-level components live in App.tsx or dedicated files.
+- Data fetching: The frontend is designed to call the backend API at endpoints under /api/* (auth, modules, quiz, nasa-tlx, results, admin). Use fetch or your preferred HTTP client to make requests; authentication uses JWT access tokens in `Authorization: Bearer <token>` header.
+- State management: Local React state and component-level state are used; no global store is present in the current snapshot (can be added if needed: Redux, Zustand, or Context API).
+
+DATA FLOW (typical interactions)
+================================================================================
+1. User registers / logs in via POST /api/auth/login or /api/auth/register.
+2. On successful auth, store access token and optionally refresh token.
+3. Call GET /api/modules to fetch available modules and render module list.
+4. When user opens a module, fetch module content and any associated quiz questions.
+5. Submit quiz answers to POST /api/quiz/submit and render results.
+6. Admin UI calls /api/admin/* endpoints for analytics and CSV export.
+
+STYLING & DESIGN SYSTEM
+================================================================================
+- Tailwind CSS utility classes compose the UI styling.
+- Theme variables and small CSS injections exist in App.tsx to handle custom animations (shimmer), range input styling, and scrollbars.
+- Icons: lucide-react
+- Charts: recharts for visual analytics (BarChart, LineChart, ResponsiveContainer)
+
+TESTING & LINTING
+================================================================================
+- No unit tests or e2e tests are included in the current snapshot. Recommended additions:
+  - Unit tests for key components with Jest + React Testing Library
+  - E2E tests with Playwright or Cypress
+  - Prettier + ESLint for code formatting and linting
+
+BUILD & DEPLOY
+================================================================================
+- Build production bundle with `npm run build` (vite build).
+- Deploy static build to any static hosting (Netlify, Vercel, S3 + CloudFront). If backend is separate deploy backend as an API server and set `CORS_ORIGIN` accordingly.
+
+INCLUDED SOURCE SNIPPETS
+================================================================================
+(Example: src/main.tsx)
+
+import { createRoot } from "react-dom/client";
+import App from "./app/App.tsx";
+import "./styles/index.css";
+
+createRoot(document.getElementById("root")!).render(<App />);
+
+(Excerpt: core UI helper from src/app/App.tsx)
+
+function TealButton({ children, onClick }) {
+  return (
+    <button onClick={onClick} className="inline-flex items-center gap-2 font-semibold rounded-xl bg-[#16A085] text-white px-5 py-2.5">
+      {children}
+    </button>
+  );
+}
+
+COMPONENTS SUMMARY
+================================================================================
+- Buttons, Inputs, Fields, PasswordField, ProgressBar, Badge, StatCard: fundamental building blocks
+- Chart wrappers and ResponsiveContainer usage for analytics
+- Skeleton loaders for improved perceived performance
+
+DOCUMENTATION NOTES (what I generated)
+================================================================================
+This file is a complete frontend documentation bundle describing:
+- Project metadata and run steps
+- Dependency list (high-level)
+- File structure with key files and descriptions
+- Architecture and data flow diagrams (textual)
+- Styling and design notes
+- Example code snippets for entrypoint and helpers
+
+NEXT STEPS (packaging and delivery)
+================================================================================
+- Download the project from the below github repo link: https://github.com/Sammie-web/Focus-Learn
+- Download the backend of the project from the below github repo link: https://github.com/Sammie-web/focus-learn-backend
+- I can export this text file as a Notepad `.txt` (created) or convert to Word `.docx` if you prefer.
+- I can also create a ZIP containing selected source files and this documentation for easy download.
+
+================================================================================
